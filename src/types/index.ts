@@ -1,0 +1,293 @@
+export type UserRole = 'candidate' | 'recruiter' | 'hiring_manager' | 'interviewer' | 'admin';
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  avatar?: string;
+  department?: string;
+  phone?: string;
+  gender?: string;
+  location?: string;
+  createdAt: string;
+}
+
+export type JobStatus = 'active' | 'draft' | 'closed';
+export type WorkType = 'Full-Time' | 'Part-Time' | 'Contract' | 'Remote' | 'Hybrid';
+
+export interface AssessmentQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctAnswer: number; // 0-based index
+  points: number;
+}
+
+export interface JobAssessment {
+  id: string;
+  jobId: string;
+  title: string;
+  passingScore: number; // e.g., 70
+  durationMinutes: number;
+  questions: AssessmentQuestion[];
+}
+
+export interface Job {
+  id: string;
+  title: string;
+  department: string;
+  country?: string;
+  location: string;
+  workType: WorkType;
+  experienceLevel: string;
+  salaryRange: string;
+  description: string;
+  responsibilities: string[];
+  requirements: string[];
+  benefits: string[];
+  status: JobStatus;
+  applicationCount: number;
+  assessmentId?: string;
+  postedAt: string;
+  deadline?: string;
+}
+
+export type ApplicationStage =
+  | 'Submitted'
+  | 'Assessment Passed'
+  | 'Assessment Failed'
+  | 'Screening'
+  | 'Technical Interview'
+  | 'Final Interview'
+  | 'Offer Extended'
+  | 'Hired'
+  | 'Rejected';
+
+export interface SubmittedDocument {
+  id: string;
+  applicationId: string;
+  fileName: string;
+  fileType: 'resume' | 'id_card' | 'cover_letter' | 'certificate' | 'passport' | 'covid_cover' | 'other';
+  fileSize: string;
+  uploadedAt: string;
+  encryptedHash: string;
+  status: 'verified' | 'pending' | 'flagged';
+  downloadUrl?: string;
+}
+
+export interface CandidateAssessmentResult {
+  id: string;
+  applicationId: string;
+  score: number; // percentage e.g. 85
+  passed: boolean;
+  completedAt: string;
+  totalQuestions: number;
+  correctAnswers: number;
+  answers: Record<string, number>; // questionId -> selectedIndex
+}
+
+export interface Application {
+  id: string;
+  jobId: string;
+  jobTitle: string;
+  candidateId: string;
+  candidateName: string;
+  candidateEmail: string;
+  candidatePhone: string;
+  candidateLocation: string;
+  experienceYears: number;
+  currentCompany?: string;
+  linkedinUrl?: string;
+  portfolioUrl?: string;
+  stage: ApplicationStage;
+  appliedAt: string;
+  lastUpdated: string;
+  assessmentResult?: CandidateAssessmentResult;
+  documents: SubmittedDocument[];
+  notes?: string[];
+  rating?: number; // 1-5
+
+  // Apex Assessment System (2-stage paid pipeline: assessment test + AI video interview)
+  apexStage1Paid?: boolean;
+  apexStage1Passed?: boolean;
+  apexStage1Score?: number;
+  apexStage2Paid?: boolean;
+  apexStage2Passed?: boolean;
+  apexStage2AiScore?: number;
+  apexInterviewExpiresAt?: string;
+}
+
+export type PaystackProvider = 'mpesa' | 'visa' | 'airtel_money';
+
+export interface PaystackPayment {
+  id: string;
+  applicationId: string;
+  candidateId: string;
+  candidateEmail: string;
+  candidateName: string;
+  amountKsh: number;
+  provider: PaystackProvider;
+  phoneNumberOrCard: string;
+  transactionRef: string;
+  stage: 'stage_1_assessment' | 'stage_2_ai_interview';
+  status: 'approved' | 'failed' | 'pending';
+  createdAt: string;
+}
+
+export interface ApexExam {
+  id: string;
+  jobTitle: string;
+  name: string;
+  description?: string;
+  category?: string;
+  costKsh: number;
+  isActive: boolean;
+  questionsPerAttempt: number;
+  timeLimitMinutes: number;
+  passMarkPercent: number;
+  examType: 'general' | 'professional';
+  interviewCostKsh?: number | null;
+  interviewPassMarkPercent?: number | null;
+}
+
+export interface ApexCourseModule {
+  id: string;
+  courseId: string;
+  title: string;
+  contentType: 'text' | 'video' | 'quiz';
+  contentBody?: string | null;
+  contentUrl?: string | null;
+  documentUrl?: string | null;
+  documentName?: string | null;
+  orderIndex: number;
+}
+
+export interface ApexCourse {
+  id: string;
+  name: string;
+  description?: string;
+  category?: string;
+  durationDays: number;
+  costKsh: number;
+  passMarkPercent: number;
+  isActive: boolean;
+  modules?: ApexCourseModule[];
+}
+
+export interface ApexPackage {
+  id: string;
+  name: string;
+  description?: string;
+  category?: string;
+  examId: string;
+  courseId: string;
+  costKsh: number;
+  certificateRule: 'AND' | 'OR';
+  isActive: boolean;
+}
+
+export interface ApexInterviewProduct {
+  id: string;
+  jobTitle: string;
+  name: string;
+  description?: string;
+  costKsh: number;
+  isActive: boolean;
+}
+
+export interface ApexCertificate {
+  id: string;
+  candidateId: string;
+  candidateName: string;
+  sourceType: 'exam' | 'course' | 'package';
+  sourceId: string;
+  sourceName: string;
+  verificationCode: string;
+  pdfUrl?: string | null;
+  status: 'pending_approval' | 'approved';
+  approvedAt?: string | null;
+  approvedBy?: string | null;
+  issuedAt: string;
+}
+
+export interface ApexQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  category: string;
+  points: number;
+  examId: string | null;
+}
+
+export interface AiInterviewConfig {
+  id: string;
+  jobId: string;
+  promptScript: string;
+  timeLimitPerQuestionSeconds: number;
+  passingScore: number;
+  questions: string[];
+}
+
+export interface AiInterviewSession {
+  id: string;
+  applicationId: string;
+  candidateName: string;
+  candidateEmail: string;
+  status: 'pending_payment' | 'paid_ready' | 'in_progress' | 'completed';
+  score?: number;
+  transcript?: Array<{ speaker: 'AI Recruiter' | 'Candidate'; message: string; timestamp: string }>;
+  videoFeedStatus?: boolean;
+  completedAt?: string;
+}
+
+export interface Interview {
+  id: string;
+  applicationId: string;
+  candidateName: string;
+  candidateEmail: string;
+  jobTitle: string;
+  interviewerId: string;
+  interviewerName: string;
+  stage: ApplicationStage;
+  scheduledAt: string; // ISO date string
+  durationMinutes: number;
+  meetingLink: string;
+  locationOrPlatform: string;
+  status: 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
+  notes?: string;
+}
+
+export interface EmailLog {
+  id: string;
+  candidateId: string;
+  candidateName: string;
+  candidateEmail: string;
+  subject: string;
+  bodyPreview: string;
+  fullBody: string;
+  sentAt: string;
+  status: 'delivered' | 'sent' | 'failed';
+  triggerEvent: 'assessment_pass' | 'application_received' | 'interview_scheduled' | 'stage_change' | 'custom';
+  pdfAttachmentName?: string;
+  pdfDataUrl?: string;
+}
+
+export interface RbacRole {
+  role: UserRole;
+  title: string;
+  description: string;
+  permissions: {
+    viewJobs: boolean;
+    manageJobs: boolean;
+    applyToJobs: boolean;
+    viewCandidates: boolean;
+    updateCandidateStatus: boolean;
+    bulkEditCandidates: boolean;
+    scheduleInterviews: boolean;
+    viewDocumentVault: boolean;
+    viewEmailLogs: boolean;
+    manageTeamRbac: boolean;
+  };
+}
