@@ -417,7 +417,7 @@ export const PipelinePage: React.FC<PipelinePageProps> = ({ initialJobId }) => {
                 <strong>Location:</strong> {inspectApp.candidateLocation}
               </p>
               <p>
-                <strong>Experience:</strong> {inspectApp.experienceYears} Years
+                <strong>Experience:</strong> {inspectApp.experienceYears || 'Not specified'}
               </p>
             </div>
 

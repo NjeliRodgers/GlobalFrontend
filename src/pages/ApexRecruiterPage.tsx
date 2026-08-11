@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ApexQuestion, ApexExam, ApexInterviewProduct, ApexCourse, ApexCourseModule, ApexPackage, PaystackPayment, AiInterviewSession, ApexCertificate } from '../types';
+import PackageInstructionsModal from '../components/PackageInstructionsModal';
 import {
   getApexExams,
   saveApexExam,
@@ -69,6 +70,7 @@ export const ApexRecruiterPage: React.FC = () => {
   // Packages
   const [packages, setPackages] = useState<ApexPackage[]>([]);
   const [editingPackage, setEditingPackage] = useState<ApexPackage | null>(null);
+  const [instructionsPackage, setInstructionsPackage] = useState<ApexPackage | null>(null);
 
   // Interview Products
   const [products, setProducts] = useState<ApexInterviewProduct[]>([]);
@@ -969,7 +971,7 @@ export const ApexRecruiterPage: React.FC = () => {
                     <div key={m.id} className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-950">
                       <span className="text-xs flex items-center gap-1.5">
                         {m.orderIndex + 1}. {m.title} <span className="text-slate-500">({m.contentType})</span>
-                        {m.documentUrl && <FileText className="h-3 w-3 text-sky-400" titleAccess="Has PDF" />}
+                        {m.documentUrl && <FileText className="h-3 w-3 text-sky-400"><title>Has PDF</title></FileText>}
                       </span>
                       <div className="flex items-center gap-2">
                         <button onClick={() => setEditingModule(m)} className="p-1.5 text-indigo-400 hover:bg-indigo-950 rounded-lg cursor-pointer">
@@ -1136,6 +1138,18 @@ export const ApexRecruiterPage: React.FC = () => {
             </form>
           )}
 
+          {instructionsPackage && (
+            <PackageInstructionsModal
+              pkg={instructionsPackage}
+              onClose={() => setInstructionsPackage(null)}
+              onSave={async (updated) => {
+                await saveApexPackage(updated);
+                setPackages(await getApexPackages());
+                setInstructionsPackage(null);
+              }}
+            />
+          )}
+
           <div className="space-y-3">
             {packages.length === 0 && <p className="text-center py-8 text-slate-400 text-xs">No packages created yet.</p>}
             {packages.map((p) => {
@@ -1158,6 +1172,9 @@ export const ApexRecruiterPage: React.FC = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-2 self-start sm:self-center">
+                    <button onClick={() => setInstructionsPackage(p)} className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg cursor-pointer" title="Edit Instructions & Guidelines">
+                      <FileText className="h-4 w-4" />
+                    </button>
                     <button onClick={() => setEditingPackage(p)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg cursor-pointer">
                       <Edit2 className="h-4 w-4" />
                     </button>

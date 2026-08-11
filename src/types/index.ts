@@ -175,6 +175,14 @@ export interface ApexCourse {
   modules?: ApexCourseModule[];
 }
 
+export interface ApexPackageInstructions {
+  whatItCarries?: string;
+  whyStudyIt?: string;
+  whyCertificateMatters?: string;
+  howToCompleteSteps?: string[];
+  confidentialityNote?: string;
+}
+
 export interface ApexPackage {
   id: string;
   name: string;
@@ -185,6 +193,7 @@ export interface ApexPackage {
   costKsh: number;
   certificateRule: 'AND' | 'OR';
   isActive: boolean;
+  instructions?: ApexPackageInstructions | null;
 }
 
 export interface ApexInterviewProduct {
@@ -269,8 +278,7 @@ export interface EmailLog {
   fullBody: string;
   sentAt: string;
   status: 'delivered' | 'sent' | 'failed';
-  triggerEvent: 'assessment_pass' | 'application_received' | 'interview_scheduled' | 'stage_change' | 'custom';
-  pdfAttachmentName?: string;
+triggerEvent: 'assessment_pass' | 'assessment_fail' | 'assessment_completed' | 'interview_pass' | 'interview_fail' | 'application_received' | 'interview_scheduled' | 'stage_change' | 'password_reset' | 'account_activation' | 'apex_enrollment_payment_received' | 'custom';  pdfAttachmentName?: string;
   pdfDataUrl?: string;
 }
 

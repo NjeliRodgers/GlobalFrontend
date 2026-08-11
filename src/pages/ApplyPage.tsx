@@ -94,7 +94,7 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack }) => {
   const [candidateEmail, setCandidateEmail] = useState(user?.email || '');
   const [candidatePhone, setCandidatePhone] = useState(user?.phone || '');
   const [candidateLocation, setCandidateLocation] = useState(user?.location || '');
-  const [experienceYears, setExperienceYears] = useState<number | ''>('');
+  const [experienceYears, setExperienceYears] = useState('');
   const [currentCompany, setCurrentCompany] = useState('');
   const [linkedinUrl, setLinkedinUrl] = useState('');
   const [portfolioUrl, setPortfolioUrl] = useState('');
@@ -144,8 +144,6 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack }) => {
     if (!candidateEmail.trim()) missing.push('Email Address');
     if (!candidatePhone.trim()) missing.push('Phone Number');
     if (!candidateLocation.trim()) missing.push('Current Location');
-    if (!experienceYears && experienceYears !== 0) missing.push('Years of Experience');
-    if (!currentCompany.trim()) missing.push('Current Company');
     if (!resumeFile) missing.push('Resume / CV');
     if (!idFile) missing.push('National ID / Passport');
 
@@ -344,7 +342,7 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack }) => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name <span className="text-rose-500">*</span></label>
                   <div className="relative">
                     <User className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                     <input
@@ -408,27 +406,24 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack }) => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Years of Experience</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Years of Experience (Optional)</label>
                   <input
-                    type="number"
+                    type="text"
                     value={experienceYears}
-                    onChange={(e) => setExperienceYears(Number(e.target.value))}
-                    min={0}
-                    max={40}
-                    required
+                    onChange={(e) => setExperienceYears(e.target.value)}
+                    placeholder="e.g. 3 years 5 months"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Current Company</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Current Company (Optional)</label>
                   <div className="relative">
                     <Briefcase className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                     <input
                       type="text"
                       value={currentCompany}
                       onChange={(e) => setCurrentCompany(e.target.value)}
-                      required
                       className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
                     />
                   </div>

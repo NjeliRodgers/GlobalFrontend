@@ -19,6 +19,12 @@ export const TeamRbacPage: React.FC = () => {
   const [addSuccessMsg, setAddSuccessMsg] = useState('');
 
   const isPrimaryAdminOrRecruiter = role === 'admin' || role === 'recruiter';
+  const roleOrder: UserRole[] = ['admin', 'recruiter', 'hiring_manager', 'interviewer'];
+  const roleCounts = roleOrder.reduce<Record<UserRole, number>>((acc, roleKey) => {
+    acc[roleKey] = users.filter((u) => u.role === roleKey).length;
+    return acc;
+  }, {} as Record<UserRole, number>);
+  const candidateCount = users.filter((u) => u.role === 'candidate').length;
 
   useEffect(() => {
     loadUsers();
@@ -83,6 +89,22 @@ export const TeamRbacPage: React.FC = () => {
           <span>{addSuccessMsg}</span>
         </div>
       )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+        {roleOrder.map((roleKey) => {
+          const roleLabel = roleKey.replace('_', ' ');
+          return (
+            <div key={roleKey} className="bg-slate-50 rounded-2xl border border-slate-200 p-4 text-sm text-slate-700">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-2">{roleLabel}</p>
+              <p className="text-3xl font-extrabold text-slate-900">{roleCounts[roleKey] ?? 0}</p>
+            </div>
+          );
+        })}
+        <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4 text-sm text-slate-700">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-2">Candidates</p>
+          <p className="text-3xl font-extrabold text-slate-900">{candidateCount}</p>
+        </div>
+      </div>
 
       {/* Permissions Matrix */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
@@ -173,18 +195,37 @@ export const TeamRbacPage: React.FC = () => {
         {loading ? (
           <div className="py-8 text-center text-xs text-slate-400">Loading team members...</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {users.map((u) => (
-              <div key={u.id} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-slate-900 text-xs block">{u.name}</span>
-                  <span className="text-[11px] text-slate-500 font-mono">{u.email}</span>
+          <div className="space-y-5">
+            {(['admin', 'recruiter', 'hiring_manager', 'interviewer'] as UserRole[]).map((roleKey) => {
+              const roleUsers = users.filter((u) => u.role === roleKey);
+              if (roleUsers.length === 0) return null;
+              const roleLabel = roleKey.replace('_', ' ');
+              return (
+                <div key={roleKey}>
+                  <h3 className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-2">
+                    {roleLabel} ({roleUsers.length})
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {roleUsers.map((u) => (
+                      <div key={u.id} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                        <div>
+                          <span className="font-bold text-slate-900 text-xs block">{u.name}</span>
+                          <span className="text-[11px] text-slate-500 font-mono">{u.email}</span>
+                        </div>
+                        <span className="px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-extrabold rounded-full uppercase">
+                          {roleLabel}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <span className="px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-extrabold rounded-full uppercase">
-                  {u.role.replace('_', ' ')}
-                </span>
-              </div>
-            ))}
+              );
+            })}
+            {users.filter((u) => u.role === 'candidate').length > 0 && (
+              <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-100">
+                {users.filter((u) => u.role === 'candidate').length} candidate account(s) not shown here — this page covers team access only.
+              </p>
+            )}
           </div>
         )}
       </div>
