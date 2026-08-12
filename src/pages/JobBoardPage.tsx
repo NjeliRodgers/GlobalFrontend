@@ -1,20 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Job } from '../types';
 import { fetchJobs } from '../api/jobsApi';
+import { fetchApplications } from '../api/applicationsApi';
 import { JobCard } from '../components/JobCard';
 import { JobFilter } from '../components/JobFilter';
 import { useAuth } from '../auth/AuthContext';
-import { Briefcase, Sparkles, Building2, Globe } from 'lucide-react';
+import { Briefcase, Sparkles, Building2, Globe, Layers, Wallet, ChevronRight } from 'lucide-react';
 import rodPhoto from '../public/Rod.png.jpg';
 interface JobBoardPageProps {
   onSelectJobForDetails: (job: Job) => void;
   onSelectJobForApply: (job: Job) => void;
+  onNavigateToSponsorship?: () => void;
+  onNavigateToFunding?: () => void;
 }
 
-export const JobBoardPage: React.FC<JobBoardPageProps> = ({ onSelectJobForDetails, onSelectJobForApply }) => {
-  const { isAuthenticated, openAuthModal } = useAuth();
+export const JobBoardPage: React.FC<JobBoardPageProps> = ({
+  onSelectJobForDetails,
+  onSelectJobForApply,
+  onNavigateToSponsorship,
+  onNavigateToFunding
+}) => {
+  const { isAuthenticated, user, openAuthModal } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,6 +34,18 @@ export const JobBoardPage: React.FC<JobBoardPageProps> = ({ onSelectJobForDetail
   useEffect(() => {
     loadJobs();
   }, []);
+
+  // Track which jobs this candidate has already applied to, so the "Apply"
+  // button can be disabled instead of letting them submit a duplicate.
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      setAppliedJobIds(new Set());
+      return;
+    }
+    fetchApplications({ candidateId: user.id }).then((apps) => {
+      setAppliedJobIds(new Set(apps.map((a) => a.jobId)));
+    });
+  }, [isAuthenticated, user?.id]);
 
   const loadJobs = async () => {
     setLoading(true);
@@ -82,10 +103,16 @@ export const JobBoardPage: React.FC<JobBoardPageProps> = ({ onSelectJobForDetail
 
         <div className="relative grid lg:grid-cols-[1.45fr_0.55fr]">
           <div className="px-6 py-8 sm:px-10 sm:py-11 lg:px-12">
-            <span className="inline-flex items-center gap-2 rounded-full border border-blue-900/10 bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#1f4e79] shadow-sm">
-              <Sparkles className="h-3.5 w-3.5 text-[#49769c]" />
-              Global Talent Plus
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-blue-900/10 bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#1f4e79] shadow-sm">
+                <Sparkles className="h-3.5 w-3.5 text-[#49769c]" />
+                Global Talent Plus
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-blue-900/10 bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#1f4e79] shadow-sm">
+                <Globe className="h-3.5 w-3.5 text-[#49769c]" />
+                International opportunities
+              </span>
+            </div>
 
             <h1 className="mt-5 max-w-2xl text-3xl font-extrabold tracking-[-0.035em] text-slate-900 sm:text-4xl lg:text-[2.7rem] lg:leading-[1.08]">
               Build a career that
@@ -97,25 +124,58 @@ export const JobBoardPage: React.FC<JobBoardPageProps> = ({ onSelectJobForDetail
               what employers need, and apply with confidence when you find the right fit.
             </p>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#1f4e79]">
-                  <Building2 className="h-4.5 w-4.5" />
+            <div className="mt-8 flex flex-wrap items-stretch gap-2">
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm shrink-0">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-[#1f4e79] shrink-0">
+                  <Building2 className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-xl font-extrabold leading-none text-slate-900">
+                  <p className="text-base font-extrabold leading-none text-slate-900">
                     {loading ? '—' : jobs.length}
                   </p>
-                  <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                  <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.1em] text-slate-500 whitespace-nowrap">
                     Active positions
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 px-2 py-2 text-xs font-semibold text-slate-600">
-                <Globe className="h-4 w-4 text-[#49769c]" />
-                International opportunities
-              </div>
+              {isAuthenticated && onNavigateToSponsorship && (
+                <button
+                  type="button"
+                  onClick={onNavigateToSponsorship}
+                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm text-left hover:border-[#1f4e79]/40 hover:shadow-md transition-all cursor-pointer shrink-0 max-w-[190px]"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-[#1f4e79] shrink-0">
+                    <Layers className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-extrabold leading-tight text-slate-900 truncate">Sponsorship process</p>
+                    <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-slate-500 truncate">
+                      Packages &amp; how it works
+                    </p>
+                  </div>
+                  <ChevronRight className="h-3 w-3 text-slate-400 ml-0.5 shrink-0" />
+                </button>
+              )}
+
+              {isAuthenticated && onNavigateToFunding && (
+                <button
+                  type="button"
+                  onClick={onNavigateToFunding}
+                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm text-left hover:border-[#1f4e79]/40 hover:shadow-md transition-all cursor-pointer shrink-0 max-w-[190px]"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-[#1f4e79] shrink-0">
+                    <Wallet className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-extrabold leading-tight text-slate-900 truncate">Funding Dashboard</p>
+                    <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-slate-500 truncate">
+                      Track your sponsorship
+                    </p>
+                  </div>
+                  <ChevronRight className="h-3 w-3 text-slate-400 ml-0.5 shrink-0" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -176,6 +236,7 @@ export const JobBoardPage: React.FC<JobBoardPageProps> = ({ onSelectJobForDetail
               job={job}
               onApplyClick={handleApplyClick}
               onViewDetails={onSelectJobForDetails}
+              alreadyApplied={appliedJobIds.has(job.id)}
             />
           ))}
         </div>

@@ -7,9 +7,16 @@ interface JobCardProps {
   onApplyClick: (job: Job) => void;
   onViewDetails: (job: Job) => void;
   isSavedInitial?: boolean;
+  alreadyApplied?: boolean;
 }
 
-export const JobCard: React.FC<JobCardProps> = ({ job, onApplyClick, onViewDetails, isSavedInitial = false }) => {
+export const JobCard: React.FC<JobCardProps> = ({
+  job,
+  onApplyClick,
+  onViewDetails,
+  isSavedInitial = false,
+  alreadyApplied = false
+}) => {
   const [isSaved, setIsSaved] = useState(isSavedInitial);
 
   const handleToggleSave = (e: React.MouseEvent) => {
@@ -49,7 +56,9 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onApplyClick, onViewDetai
           </button>
         </div>
 
-        <p className="text-sm text-slate-600 line-clamp-2 mb-4 leading-relaxed">{job.description}</p>
+        <p className="text-sm text-slate-600 line-clamp-2 mb-4 leading-relaxed">
+          {job.description.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()}
+        </p>
 
         {/* Metadata Badges */}
         <div className="flex flex-wrap gap-2 text-xs text-slate-600 mb-5">
@@ -83,10 +92,15 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onApplyClick, onViewDetai
       <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
         {/* Apply Button at Left Corner */}
         <button
-          onClick={() => onApplyClick(job)}
-          className="text-xs font-semibold tracking-wide text-white bg-[#1f4e79] hover:bg-[#102a43] px-5 py-2 rounded-lg shadow-xs hover:shadow-md transition cursor-pointer"
+          onClick={() => !alreadyApplied && onApplyClick(job)}
+          disabled={alreadyApplied}
+          className={
+            alreadyApplied
+              ? 'text-xs font-semibold tracking-wide text-slate-400 bg-slate-100 px-5 py-2 rounded-lg cursor-not-allowed'
+              : 'text-xs font-semibold tracking-wide text-white bg-[#1f4e79] hover:bg-[#102a43] px-5 py-2 rounded-lg shadow-xs hover:shadow-md transition cursor-pointer'
+          }
         >
-          Apply
+          {alreadyApplied ? 'Already Applied' : 'Apply'}
         </button>
 
         <button

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Job, SubmittedDocument } from '../types';
 import { useAuth } from '../auth/AuthContext';
-import { submitApplication } from '../api/applicationsApi';
+import { submitApplication, fetchApplications } from '../api/applicationsApi';
 import {
   User,
   Mail,
@@ -65,7 +65,7 @@ const COMPLIANCE_QUESTIONS: ComplianceQuestion[] = [
   },
   {
     id: 'hasApexCertificate',
-    label: 'Have you completed the Apex Assessment test?',
+    label: 'Have you completed any Apex Training Certification required in this role?',
     icon: <Award className="h-4 w-4" />,
     needsUploadOnYes: true,
     uploadLabel: 'Upload Apex Assessment Certificate',
@@ -126,6 +126,22 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack }) => {
   // for a couple seconds, THEN send the candidate back to the job board —
   // they should never land straight back on recommended jobs with no feedback.
   const [submitted, setSubmitted] = useState(false);
+
+  // Block re-applying to a job the candidate has already applied for —
+  // checked once on mount so the form never even renders for a duplicate.
+  const [checkingExisting, setCheckingExisting] = useState(true);
+  const [alreadyApplied, setAlreadyApplied] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setCheckingExisting(false);
+      return;
+    }
+    fetchApplications({ candidateId: user.id, jobId: job.id }).then((apps) => {
+      setAlreadyApplied(apps.length > 0);
+      setCheckingExisting(false);
+    });
+  }, [user?.id, job.id]);
 
   const setComplianceAnswer = (questionId: string, answer: ComplianceAnswer) => {
     setComplianceAnswers((current) => ({ ...current, [questionId]: answer }));
@@ -271,6 +287,37 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack }) => {
       setSaving(false);
     }
   };
+
+  if (checkingExisting) {
+    return (
+      <div className="max-w-3xl mx-auto py-16 flex justify-center">
+        <div className="h-8 w-8 border-2 border-slate-200 border-t-indigo-600 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (alreadyApplied) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <div className="bg-white rounded-2xl border border-slate-200 p-10 shadow-xs flex flex-col items-center text-center gap-4">
+          <div className="h-14 w-14 rounded-full bg-amber-50 flex items-center justify-center">
+            <ShieldCheck className="h-7 w-7 text-amber-600" />
+          </div>
+          <h2 className="text-xl font-extrabold text-slate-900">You have already applied for this position</h2>
+          <p className="text-sm text-slate-500 max-w-sm">
+            You've already submitted an application for <strong className="text-slate-700">{job.title}</strong>.
+            You can track its progress from your candidate portal.
+          </p>
+          <button
+            onClick={onBack}
+            className="px-5 py-2.5 bg-[#1f4e79] hover:bg-[#102a43] text-white font-semibold text-xs rounded-lg shadow-sm transition cursor-pointer"
+          >
+            Back to Job Board
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (submitted) {
     return (

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Job } from '../types';
 import { useAuth } from '../auth/AuthContext';
+import { fetchApplications } from '../api/applicationsApi';
 import {
   MapPin,
   Briefcase,
@@ -18,12 +19,23 @@ interface JobDetailPageProps {
 }
 
 export const JobDetailPage: React.FC<JobDetailPageProps> = ({ job, onBack, onApply }) => {
-  const { isAuthenticated, openAuthModal } = useAuth();
+  const { isAuthenticated, user, openAuthModal } = useAuth();
+  const [alreadyApplied, setAlreadyApplied] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) {
+      setAlreadyApplied(false);
+      return;
+    }
+    fetchApplications({ candidateId: user.id, jobId: job.id }).then((apps) => {
+      setAlreadyApplied(apps.length > 0);
+    });
+  }, [isAuthenticated, user?.id, job.id]);
 
   const handleApplyClick = () => {
     if (!isAuthenticated) {
       openAuthModal(job.id);
-    } else {
+    } else if (!alreadyApplied) {
       onApply(job);
     }
   };
@@ -50,9 +62,14 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ job, onBack, onApp
 
           <button
             onClick={handleApplyClick}
-            className="px-6 py-3 bg-[#1f4e79] hover:bg-[#102a43] text-white font-semibold text-sm tracking-wide rounded-lg shadow-md transition cursor-pointer shrink-0"
+            disabled={isAuthenticated && alreadyApplied}
+            className={
+              isAuthenticated && alreadyApplied
+                ? 'px-6 py-3 bg-slate-100 text-slate-400 font-semibold text-sm tracking-wide rounded-lg cursor-not-allowed shrink-0'
+                : 'px-6 py-3 bg-[#1f4e79] hover:bg-[#102a43] text-white font-semibold text-sm tracking-wide rounded-lg shadow-md transition cursor-pointer shrink-0'
+            }
           >
-            Apply For Position
+            {isAuthenticated && alreadyApplied ? 'Already Applied' : 'Apply For Position'}
           </button>
         </div>
 
@@ -86,7 +103,10 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ job, onBack, onApp
         <div className="md:col-span-2 space-y-6">
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
             <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-2">Role Overview</h3>
-            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{job.description}</p>
+            <div
+              className="text-sm text-slate-700 leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-bold [&_b]:font-bold [&_em]:italic [&_u]:underline [&_p]:mb-2"
+              dangerouslySetInnerHTML={{ __html: job.description }}
+            />
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">

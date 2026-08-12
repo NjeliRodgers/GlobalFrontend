@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Job, Application } from '../types';
 import { fetchJobs, createJob } from '../api/jobsApi';
 import { fetchApplications } from '../api/applicationsApi';
+import { RichTextEditor } from '../components/RichTextEditor';
 import {
   Users,
   Briefcase,
@@ -301,11 +302,10 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Job Description Overview</label>
-                <textarea
+                <RichTextEditor
                   value={newDescription}
-                  onChange={(e) => setNewDescription(e.target.value)}
-                  rows={3}
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  onChange={setNewDescription}
+                  placeholder="Describe the role — use the toolbar for bold, italic, or lists…"
                 />
               </div>
 

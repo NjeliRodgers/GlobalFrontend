@@ -6,6 +6,8 @@ import { Sidebar } from './components/Sidebar';
 import { AuthModal } from './auth/AuthModal';
 
 import { JobBoardPage } from './pages/JobBoardPage';
+import { SponsorshipProcessPage } from './pages/SponsorshipProcessPage';
+import { FundingDashboardPage } from './pages/FundingDashboardPage';
 import { JobDetailPage } from './pages/JobDetailPage';
 import { ApplyPage } from './pages/ApplyPage';
 import { ApexRecruiterPage } from './pages/ApexRecruiterPage';
@@ -126,7 +128,17 @@ export const AppShell: React.FC = () => {
             <JobBoardPage
               onSelectJobForDetails={handleSelectJobForDetails}
               onSelectJobForApply={handleSelectJobForApply}
+              onNavigateToSponsorship={() => setActiveTab('sponsorship_process')}
+              onNavigateToFunding={() => setActiveTab('funding_dashboard')}
             />
+          )}
+
+          {activeTab === 'sponsorship_process' && isAuthenticated && (
+            <SponsorshipProcessPage onBack={() => setActiveTab('job_board')} />
+          )}
+
+          {activeTab === 'funding_dashboard' && isAuthenticated && (
+            <FundingDashboardPage onBack={() => setActiveTab('job_board')} />
           )}
 
           {activeTab === 'job_detail' && selectedJob && (
