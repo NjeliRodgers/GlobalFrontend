@@ -49,6 +49,7 @@ export interface Job {
   status: JobStatus;
   applicationCount: number;
   assessmentId?: string;
+  apexExamId?: string;
   postedAt: string;
   deadline?: string;
 }

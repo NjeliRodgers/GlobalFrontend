@@ -39,6 +39,8 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
   const [newWorkType, setNewWorkType] = useState('Hybrid');
   const [newSalary, setNewSalary] = useState('$130,000 - $170,000 / yr');
   const [newDescription, setNewDescription] = useState('');
+  const [newApexExamId, setNewApexExamId] = useState('');
+  const [newJobError, setNewJobError] = useState('');
 
   useEffect(() => {
     loadDashboardData();
@@ -55,24 +57,31 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
   const handleCreateJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle || !newDepartment) return;
+    setNewJobError('');
 
-    await createJob({
-      title: newTitle,
-      department: newDepartment,
-      location: newLocation,
-      workType: newWorkType as any,
-      salaryRange: newSalary,
-      description: newDescription || 'Join our high-performing team to build scalable enterprise solutions.',
-      responsibilities: ['Architect scalable software services.', 'Collaborate with cross-functional partners.'],
-      requirements: ['Proven experience in domain engineering.', 'Strong communication and analytical skills.'],
-      benefits: ['Health, Dental, Vision', 'Competitive salary & bonus'],
-      status: 'active'
-    });
+    try {
+      await createJob({
+        title: newTitle,
+        department: newDepartment,
+        location: newLocation,
+        workType: newWorkType as any,
+        salaryRange: newSalary,
+        description: newDescription || 'Join our high-performing team to build scalable enterprise solutions.',
+        responsibilities: ['Architect scalable software services.', 'Collaborate with cross-functional partners.'],
+        requirements: ['Proven experience in domain engineering.', 'Strong communication and analytical skills.'],
+        benefits: ['Health, Dental, Vision', 'Competitive salary & bonus'],
+        status: 'active',
+        apexExamId: newApexExamId.trim()
+      });
 
-    setIsNewJobModalOpen(false);
-    setNewTitle('');
-    setNewDescription('');
-    loadDashboardData();
+      setIsNewJobModalOpen(false);
+      setNewTitle('');
+      setNewDescription('');
+      setNewApexExamId('');
+      loadDashboardData();
+    } catch (err: any) {
+      setNewJobError(err.message || 'Failed to post job. Check the Exam ID and try again.');
+    }
   };
 
   // Metrics Calculations
@@ -301,6 +310,22 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
               </div>
 
               <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Exam ID</label>
+                <input
+                  type="text"
+                  value={newApexExamId}
+                  onChange={(e) => setNewApexExamId(e.target.value)}
+                  required
+                  placeholder="e.g. 56743"
+                  maxLength={5}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Must match a 5-digit Exam ID already created in Exam Builder — the job won't post otherwise.
+                </p>
+              </div>
+
+              <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Job Description Overview</label>
                 <RichTextEditor
                   value={newDescription}
@@ -308,6 +333,12 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
                   placeholder="Describe the role — use the toolbar for bold, italic, or lists…"
                 />
               </div>
+
+              {newJobError && (
+                <div className="text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg">
+                  {newJobError}
+                </div>
+              )}
 
               <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
                 <button

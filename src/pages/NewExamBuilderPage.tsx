@@ -29,9 +29,17 @@ const fieldClass =
 const labelClass = 'block text-xs font-bold text-slate-700 mb-1';
 const hintClass = 'text-[10px] text-slate-400 mt-1';
 
+const suggestExamId = (existing: ApexExam[]): string => {
+  let candidate = '';
+  do {
+    candidate = String(Math.floor(10000 + Math.random() * 90000)); // always 5 digits: 10000-99999
+  } while (existing.some((e) => e.id === candidate));
+  return candidate;
+};
+
 export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ questions, exams, onCancel, onSaved }) => {
   const [draft, setDraft] = useState<ApexExam>({
-    id: `apex-exam-${Date.now()}`,
+    id: '',
     jobTitle: '',
     name: '',
     category: '',
@@ -72,10 +80,27 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
   const required = draft.questionsPerAttempt || 0;
   const countMismatch = required > 0 && selectedCount !== required;
 
-  const canSave = draft.jobTitle.trim().length > 0 && draft.name.trim().length > 0 && draft.costKsh > 0 && !saving;
+  const idIsValidFormat = /^\d{5}$/.test(draft.id);
+  const idIsTaken = idIsValidFormat && exams.some((e) => e.id === draft.id);
+
+  const canSave =
+    draft.jobTitle.trim().length > 0 &&
+    draft.name.trim().length > 0 &&
+    draft.costKsh > 0 &&
+    idIsValidFormat &&
+    !idIsTaken &&
+    !saving;
 
   const handleSave = async () => {
     setError('');
+    if (!idIsValidFormat) {
+      setError('Exam ID must be exactly 5 digits (e.g. 56743).');
+      return;
+    }
+    if (idIsTaken) {
+      setError('That Exam ID is already used by another exam — choose a different one.');
+      return;
+    }
     if (!canSave) {
       setError('Please fill in Job Title, Exam Name, and Exam Cost before saving.');
       return;
@@ -156,6 +181,43 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
               <div className="flex items-center gap-1.5 text-[11px] font-extrabold text-slate-500 uppercase tracking-wide">
                 <Info className="h-3.5 w-3.5" /> Basic Info
               </div>
+
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 space-y-2">
+                <label className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wide block">
+                  Exam ID (you choose this)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={draft.id}
+                    onChange={(e) => {
+                      const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 5);
+                      setDraft({ ...draft, id: digitsOnly });
+                    }}
+                    placeholder="e.g. 56743"
+                    maxLength={5}
+                    className="w-32 px-3 py-2 bg-white border border-emerald-300 rounded-xl text-lg font-black text-emerald-900 tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setDraft({ ...draft, id: suggestExamId(exams) })}
+                    className="px-3 py-2 text-[10px] font-bold text-emerald-700 bg-white border border-emerald-300 rounded-lg hover:bg-emerald-100 cursor-pointer whitespace-nowrap"
+                  >
+                    Suggest ID
+                  </button>
+                </div>
+                {draft.id && !idIsValidFormat && (
+                  <p className="text-[10px] text-rose-600 font-semibold">Must be exactly 5 digits.</p>
+                )}
+                {idIsTaken && (
+                  <p className="text-[10px] text-rose-600 font-semibold">This ID is already used by another exam.</p>
+                )}
+                <p className="text-[10px] text-emerald-700">
+                  Create Exam ID for this exam. It must be exactly 5 digits and unique across all exams.
+                </p>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelClass}>Exam Name</label>
