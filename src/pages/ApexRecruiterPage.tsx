@@ -51,6 +51,16 @@ import {
 
 type Tab = 'exams' | 'courses' | 'packages' | 'interview_products' | 'questions' | 'financials' | 'certificates' | 'transcripts';
 
+const PACKAGE_ID_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+const suggestPackageId = (existing: ApexPackage[]): string => {
+  let candidate = '';
+  do {
+    candidate = Array.from({ length: 6 }, () => PACKAGE_ID_LETTERS[Math.floor(Math.random() * PACKAGE_ID_LETTERS.length)]).join('');
+  } while (existing.some((p) => p.packageId === candidate));
+  return candidate;
+};
+
 export const ApexRecruiterPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('exams');
 
@@ -190,10 +200,21 @@ export const ApexRecruiterPage: React.FC = () => {
   };
 
   // ── Packages ──
+  const [packageIdError, setPackageIdError] = useState('');
   const handleSavePackage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPackage) return;
-    await saveApexPackage(editingPackage);
+    const normalized = (editingPackage.packageId || '').toUpperCase();
+    if (!/^[A-Z]{1,6}$/.test(normalized)) {
+      setPackageIdError('Package ID must be 1–6 letters (A–Z only).');
+      return;
+    }
+    if (packages.some((p) => p.packageId === normalized && p.id !== editingPackage.id)) {
+      setPackageIdError('That Package ID is already used by another package — choose a different one.');
+      return;
+    }
+    setPackageIdError('');
+    await saveApexPackage({ ...editingPackage, packageId: normalized });
     setEditingPackage(null);
     loadData();
   };
@@ -1027,6 +1048,7 @@ export const ApexRecruiterPage: React.FC = () => {
                 setEditingPackage({
                   id: `package-${Date.now()}`,
                   name: '',
+                  packageId: suggestPackageId(packages),
                   description: '',
                   category: '',
                   examId: exams[0]?.id || '',
@@ -1067,6 +1089,36 @@ export const ApexRecruiterPage: React.FC = () => {
                   required
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
                 />
+              </div>
+
+              <div className="bg-amber-950/40 border border-amber-800 rounded-xl px-4 py-3 space-y-2">
+                <label className="text-[10px] font-extrabold text-amber-400 uppercase tracking-wide block">
+                  Package ID (you choose this)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={editingPackage.packageId || ''}
+                    onChange={(e) => {
+                      const lettersOnly = e.target.value.replace(/[^a-zA-Z]/g, '').slice(0, 6).toUpperCase();
+                      setEditingPackage({ ...editingPackage, packageId: lettersOnly });
+                    }}
+                    placeholder="e.g. FHSORG"
+                    maxLength={6}
+                    className="w-32 px-3 py-2 bg-slate-950 border border-amber-700 rounded-xl text-lg font-black text-amber-300 tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setEditingPackage({ ...editingPackage, packageId: suggestPackageId(packages) })}
+                    className="px-3 py-2 text-[10px] font-bold text-amber-300 bg-slate-950 border border-amber-700 rounded-lg hover:bg-amber-900/40 cursor-pointer whitespace-nowrap"
+                  >
+                    Suggest ID
+                  </button>
+                </div>
+                {packageIdError && <p className="text-[10px] text-rose-400 font-semibold">{packageIdError}</p>}
+                <p className="text-[10px] text-amber-400">
+                  Up to 6 letters, automatically capitalized. Shown to candidates right after the package title.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1189,7 +1241,10 @@ export const ApexRecruiterPage: React.FC = () => {
                       <span className="text-[10px] font-extrabold bg-slate-200 text-slate-700 px-2 py-0.5 rounded">{p.certificateRule}</span>
                       {!p.isActive && <span className="text-[10px] font-extrabold bg-slate-200 text-slate-600 px-2 py-0.5 rounded">INACTIVE</span>}
                     </div>
-                    <h4 className="text-xs font-extrabold text-slate-900">{p.name}</h4>
+                    <h4 className="text-xs font-extrabold text-slate-900">
+                      {p.name}
+                      {p.packageId && <span className="text-slate-900"> - {p.packageId}</span>}
+                    </h4>
                     <p className="text-[11px] text-slate-600">
                       {exam?.name || 'Unknown exam'} + {course?.name || 'Unknown course'} · <strong className="text-amber-700">KSh {p.costKsh.toLocaleString()}</strong>
                     </p>

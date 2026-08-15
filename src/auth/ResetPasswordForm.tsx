@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { resetPasswordApi } from '../api/usersApi';
-import { Lock, CheckCircle2, KeyRound } from 'lucide-react';
+import { CheckCircle2, KeyRound } from 'lucide-react';
+import { PasswordInput } from '../components/PasswordInput';
 
 interface ResetPasswordFormProps {
   email: string;
@@ -77,33 +78,23 @@ export const ResetPasswordForm: React.FC<ResetPasswordFormProps> = ({ email, tok
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">New Password</label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-              minLength={8}
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
-              placeholder="At least 8 characters"
-            />
-          </div>
+          <PasswordInput
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            required
+            minLength={8}
+            placeholder="At least 8 characters"
+          />
         </div>
 
         <div>
           <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Confirm New Password</label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
-              placeholder="Re-enter new password"
-            />
-          </div>
+          <PasswordInput
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            placeholder="Re-enter new password"
+          />
         </div>
 
         <button

@@ -23,6 +23,7 @@ export async function signUpApi(userData: {
   role?: string;
   phone?: string;
   department?: string;
+  gender?: string;
 }): Promise<{ user: User; message: string }> {
   const res = await apiFetch('/users/signup', {
     method: 'POST',

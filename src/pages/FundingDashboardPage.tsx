@@ -56,7 +56,7 @@ export const FundingDashboardPage: React.FC<FundingDashboardPageProps> = ({ onBa
           Track your sponsorship funding.
         </h1>
 
-        <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600 sm:text-[15px]">
+        <p className="mt-4 max-w-2xl text-sm font-bold leading-7 text-black sm:text-[15px]">
           Once you're approved for a role, eligible relocation costs are tracked here. Funds can only be accessed
           after certification exams are passed and you're approved for a job.
         </p>

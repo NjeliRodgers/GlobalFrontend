@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Job, SubmittedDocument } from '../types';
 import { useAuth } from '../auth/AuthContext';
 import { submitApplication, fetchApplications } from '../api/applicationsApi';
+import { isValidEmail, isValidPhone, EMAIL_ERROR_MESSAGE, PHONE_ERROR_MESSAGE } from '../utils/validators';
 import {
   User,
   Mail,
@@ -165,6 +166,15 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack }) => {
 
     if (missing.length > 0) {
       setError(`Please complete all required fields before continuing: ${missing.join(', ')}.`);
+      return;
+    }
+
+    if (!isValidEmail(candidateEmail)) {
+      setError(EMAIL_ERROR_MESSAGE);
+      return;
+    }
+    if (!isValidPhone(candidatePhone)) {
+      setError(PHONE_ERROR_MESSAGE);
       return;
     }
 

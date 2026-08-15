@@ -8,7 +8,7 @@ interface AuthContextType {
   role: UserRole;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (data: { name: string; email: string; password: string; role?: UserRole; phone?: string; department?: string }) => Promise<{ message: string }>;
+  signup: (data: { name: string; email: string; password: string; role?: UserRole; phone?: string; department?: string; gender?: string }) => Promise<{ message: string }>;
   updateUser: (updatedData: Partial<User>) => Promise<void>;
   uploadAvatar: (file: File) => Promise<void>;
   logout: () => void;
@@ -52,7 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(res.user);
   };
 
-  const signup = async (data: { name: string; email: string; password: string; role?: UserRole; phone?: string; department?: string }) => {
+  const signup = async (data: { name: string; email: string; password: string; role?: UserRole; phone?: string; department?: string; gender?: string }) => {
     // Signing up no longer logs the user in — the account is created inactive
     // and only becomes usable once the emailed activation link is clicked.
     // We deliberately do NOT call setUser(...) here.

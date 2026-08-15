@@ -43,11 +43,11 @@ export const CandidatePortalPage: React.FC<CandidatePortalPageProps> = ({
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
   // Candidate Profile State (with defaults for active user or Elena Rostova)
-  const candidateName = user?.name || 'Elena Rostova';
-  const candidateEmail = user?.email || 'elena.rostova@example.com';
-  const candidatePhone = user?.phone || '+1 (555) 234-5678';
-  const candidateGender = user?.gender || 'Female';
-  const candidateLocation = user?.location || 'San Francisco, CA';
+  const candidateName = user?.name || '  ';
+  const candidateEmail = user?.email || ' ';
+  const candidatePhone = user?.phone || '  ';
+  const candidateGender = user?.gender || '  ';
+  const candidateLocation = user?.location || '  ';
 
   // Profile Edit Modal State
   const [isEditingProfile, setIsEditingProfile] = useState(false);

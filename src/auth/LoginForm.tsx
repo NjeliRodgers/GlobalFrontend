@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from './AuthContext';
 import { resendActivationApi } from '../api/usersApi';
-import { Mail, Lock, MailCheck } from 'lucide-react';
+import { Mail, MailCheck } from 'lucide-react';
+import { PasswordInput } from '../components/PasswordInput';
 
 interface LoginFormProps {
   onSuccess: () => void;
@@ -102,16 +103,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onSwitchToSignU
 
         <div>
           <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Password</label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
-            />
-          </div>
+          <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required />
           <div className="text-right mt-1.5">
             <button
               type="button"

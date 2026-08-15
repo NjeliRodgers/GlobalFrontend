@@ -56,7 +56,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, activeTab, setA
             <div>
               <span className="font-extrabold text-slate-900 text-lg tracking-tight">Global Talent Plus</span>
               <span className="hidden sm:inline-block ml-2 px-2 py-0.5 text-[10px] font-bold bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100">
-                Enterprise ATS
+                Recruitment Platform
               </span>
             </div>
           </div>

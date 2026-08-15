@@ -187,6 +187,7 @@ export interface ApexPackageInstructions {
 export interface ApexPackage {
   id: string;
   name: string;
+  packageId?: string;
   description?: string;
   category?: string;
   examId: string;

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from './AuthContext';
 import { UserRole } from '../types';
-import { User, Mail, Phone, Lock, UserPlus, MailCheck } from 'lucide-react';
+import { User, Mail, Phone, UserPlus, MailCheck } from 'lucide-react';
+import { PasswordInput } from '../components/PasswordInput';
+import { isValidEmail, isValidPhone, EMAIL_ERROR_MESSAGE, PHONE_ERROR_MESSAGE } from '../utils/validators';
 
 interface SignUpFormProps {
   onSuccess: () => void;
@@ -13,6 +15,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, onSwitchToLog
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [gender, setGender] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<UserRole>('candidate');
@@ -24,6 +27,14 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, onSwitchToLog
     e.preventDefault();
     if (!name || !email || !phone || !password) {
       setError('Name, email, phone number and password are required');
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setError(EMAIL_ERROR_MESSAGE);
+      return;
+    }
+    if (!isValidPhone(phone)) {
+      setError(PHONE_ERROR_MESSAGE);
       return;
     }
     if (password.length < 8) {
@@ -38,7 +49,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, onSwitchToLog
     setLoading(true);
     setError('');
     try {
-      await signup({ name, email, password, role, phone });
+      await signup({ name, email, password, role, phone, gender });
       setLoading(false);
       // Account is created but inactive — no session was started.
       // Show a confirmation screen instead of closing the modal via onSuccess.
@@ -91,7 +102,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, onSwitchToLog
               onChange={(e) => setName(e.target.value)}
               required
               className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
-              placeholder="e.g. Alex Morgan"
+              placeholder="enter your full name"
             />
           </div>
         </div>
@@ -106,7 +117,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, onSwitchToLog
               onChange={(e) => setEmail(e.target.value)}
               required
               className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
-              placeholder="alex.morgan@example.com"
+              placeholder="Your real email account"
             />
           </div>
         </div>
@@ -121,40 +132,45 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, onSwitchToLog
               onChange={(e) => setPhone(e.target.value)}
               required
               className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
-              placeholder="+1 (555) 000-0000"
+              placeholder="phone number with country code"
             />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Gender</label>
+          <select
+            value={gender}
+            onChange={(e) => setGender(e.target.value)}
+            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+          >
+            <option value="">Select gender (optional)</option>
+            <option value="Female">Female</option>
+            <option value="Male">Male</option>
+            <option value="Non-Binary">Non-Binary</option>
+            <option value="Prefer not to say">Prefer not to say</option>
+          </select>
         </div>
 
         <div>
           <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Password</label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
-              placeholder="At least 8 characters"
-            />
-          </div>
+          <PasswordInput
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={8}
+            placeholder="At least 8 characters"
+          />
         </div>
 
         <div>
           <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Confirm Password</label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
-              placeholder="Re-enter your password"
-            />
-          </div>
+          <PasswordInput
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            placeholder="Re-enter your password"
+          />
         </div>
 
         <button

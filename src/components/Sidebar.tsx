@@ -7,7 +7,8 @@ import {
   Mail,
   ShieldCheck,
   FolderLock,
-  Sliders
+  Sliders,
+  Wallet
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -27,14 +28,23 @@ const NAV_ITEMS = [
   { tab: 'apex_recruiter', label: 'Apex System Admin Control', icon: Sliders, iconColor: 'text-purple-400' },
 ];
 
+const CANDIDATE_NAV_ITEMS = [
+  { tab: 'sponsorship_process', label: 'Sponsorship Process', icon: Layers, iconColor: 'text-[#5b8bb5]' },
+  { tab: 'funding_dashboard', label: 'Funding Dashboard', icon: Wallet, iconColor: 'text-emerald-400' },
+];
+
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpen, onClose }) => {
-  const { role } = useAuth();
+  const { role, isAuthenticated } = useAuth();
 
   const isRecruiterOrAdmin = role === 'recruiter' || role === 'hiring_manager' || role === 'admin';
+  const isCandidate = isAuthenticated && role === 'candidate';
 
-  if (!isRecruiterOrAdmin) {
+  if (!isRecruiterOrAdmin && !isCandidate) {
     return null;
   }
+
+  const items = isRecruiterOrAdmin ? NAV_ITEMS : CANDIDATE_NAV_ITEMS;
+  const sectionLabel = isRecruiterOrAdmin ? 'Global Talent Plus Operations' : 'My Sponsorship';
 
   return (
     <>
@@ -53,13 +63,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
             {isOpen && (
               <div className="flex items-center justify-between px-3 mb-3 border-b border-slate-800 pb-2">
                 <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
-                  Global Talent Plus Operations
+                  {sectionLabel}
                 </span>
               </div>
             )}
 
             <div className="space-y-1">
-              {NAV_ITEMS.map(({ tab, label, icon: Icon, iconColor }) => (
+              {items.map(({ tab, label, icon: Icon, iconColor }) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
