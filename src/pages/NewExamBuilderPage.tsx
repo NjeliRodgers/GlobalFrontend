@@ -58,6 +58,8 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
   const [searchQuery, setSearchQuery] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [keyword, setKeyword] = useState('');
+  const [autoSelectMessage, setAutoSelectMessage] = useState('');
 
   const toggleQuestion = (id: string) => {
     setSelectedIds((prev) => {
@@ -66,6 +68,59 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
       else next.add(id);
       return next;
     });
+  };
+
+  // Auto-select questions from the pool that relate to a keyword (e.g. "security"),
+  // matched against the question text and its category. Picks exactly as many
+  // as "Questions per Attempt" asks for. To avoid handing out the exact same
+  // set every time the same keyword is used for a different exam, it favors
+  // questions that aren't attached to any other exam yet, and shuffles the
+  // pool each time — so overlap can happen (especially with a small bank),
+  // but the result isn't identical run to run. The admin can still manually
+  // tick/untick individual questions afterward using the existing checkboxes.
+  const shuffleQuestions = (arr: ApexQuestion[]): ApexQuestion[] => {
+    const copy = [...arr];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  };
+
+  const handleAutoSelectByKeyword = () => {
+    const kw = keyword.trim().toLowerCase();
+    if (!kw) return;
+
+    const matches = questions.filter(
+      (q) => q.question.toLowerCase().includes(kw) || (q.category || '').toLowerCase().includes(kw)
+    );
+    const required = draft.questionsPerAttempt || 0;
+
+    const isUsedElsewhere = (q: ApexQuestion) => !!q.examId && exams.some((ex) => ex.id === q.examId);
+    const unused = shuffleQuestions(matches.filter((q) => !isUsedElsewhere(q)));
+    const usedElsewhere = shuffleQuestions(matches.filter(isUsedElsewhere));
+    const orderedPool = [...unused, ...usedElsewhere];
+
+    const picked = required > 0 ? orderedPool.slice(0, required) : orderedPool;
+    setSelectedIds(new Set(picked.map((q) => q.id)));
+
+    if (matches.length === 0) {
+      setAutoSelectMessage(
+        `No questions found matching "${keyword.trim()}" — try a different keyword, or add matching questions to the Question Bank first.`
+      );
+    } else if (required > 0 && matches.length < required) {
+      setAutoSelectMessage(
+        `Only found ${matches.length} of ${required} required questions matching "${keyword.trim()}" — selected all ${matches.length}. Add more matching questions to the bank, or tick extras manually below.`
+      );
+    } else {
+      const reusedCount = picked.filter(isUsedElsewhere).length;
+      const freshCount = picked.length - reusedCount;
+      setAutoSelectMessage(
+        reusedCount > 0
+          ? `Selected ${picked.length} questions matching "${keyword.trim()}" — ${freshCount} not used in any other exam yet, ${reusedCount} reused from another exam to reach the required count.`
+          : `Selected ${picked.length} question${picked.length === 1 ? '' : 's'} matching "${keyword.trim()}", none currently used in any other exam.`
+      );
+    }
   };
 
   const filteredQuestions = useMemo(() => {
@@ -407,6 +462,35 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
                 className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
+          </div>
+
+          <div className="px-6 py-4 border-b border-emerald-200 bg-emerald-50 flex items-center gap-3 flex-wrap">
+            <div className="text-[11px] font-extrabold text-emerald-700 uppercase tracking-wide shrink-0">
+              Keyword
+            </div>
+            <div className="relative flex-1 min-w-[180px] max-w-xs">
+              <input
+                type="text"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                placeholder=" e.g Security"
+                className="w-full px-3 py-2 bg-white border border-emerald-300 rounded-xl text-xs text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleAutoSelectByKeyword}
+              disabled={!keyword.trim()}
+              className="px-3 py-2 text-[10px] font-bold text-emerald-700 bg-white border border-emerald-300 rounded-lg hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer whitespace-nowrap"
+            >
+              Auto-Select
+            </button>
+            <p className="text-[10px] text-emerald-700 basis-full">
+              Exam module
+            </p>
+            {autoSelectMessage && (
+              <p className="w-full text-[11px] font-semibold text-emerald-700">{autoSelectMessage}</p>
+            )}
           </div>
 
           <div className="p-6 space-y-2 max-h-[36rem] overflow-y-auto">
