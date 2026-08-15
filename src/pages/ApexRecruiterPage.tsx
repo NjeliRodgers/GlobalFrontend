@@ -11,6 +11,7 @@ import {
   getApexQuestions,
   saveApexQuestion,
   deleteApexQuestion,
+  uploadApexQuestionsCsv,
   getPaystackPayments,
   getAiInterviewSessions,
   unlockCandidateStageTwo,
@@ -81,6 +82,9 @@ export const ApexRecruiterPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingQuestion, setEditingQuestion] = useState<ApexQuestion | null>(null);
   const [isNewQuestion, setIsNewQuestion] = useState(false);
+  const [uploadingCsv, setUploadingCsv] = useState(false);
+  const [csvUploadResult, setCsvUploadResult] = useState<{ inserted: number; skipped: number; totalRows: number; rowErrors: { row: number; reason: string }[] } | null>(null);
+  const [csvUploadError, setCsvUploadError] = useState('');
 
   // Financial Ledger
   const [payments, setPayments] = useState<PaystackPayment[]>([]);
@@ -231,6 +235,25 @@ export const ApexRecruiterPage: React.FC = () => {
     setEditingQuestion(null);
     setIsNewQuestion(false);
     loadData();
+  };
+
+  const handleUploadQuestionsCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file name later
+    if (!file) return;
+
+    setUploadingCsv(true);
+    setCsvUploadError('');
+    setCsvUploadResult(null);
+    try {
+      const result = await uploadApexQuestionsCsv(file);
+      setCsvUploadResult(result);
+      loadData();
+    } catch (err: any) {
+      setCsvUploadError(err.message || 'Failed to upload CSV');
+    } finally {
+      setUploadingCsv(false);
+    }
   };
 
   const handleDeleteQuestion = async (id: string) => {
@@ -1325,24 +1348,59 @@ export const ApexRecruiterPage: React.FC = () => {
               />
             </div>
 
-            <button
-              onClick={() => {
-                setIsNewQuestion(true);
-                setEditingQuestion({
-                  id: `apex-q-${Date.now()}`,
-                  question: '',
-                  options: ['', '', '', ''],
-                  correctAnswer: 0,
-                  category: '',
-                  points: 2,
-                  examId: null
-                });
-              }}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
-            >
-              <Plus className="h-4 w-4" /> Add Question
-            </button>
+            <div className="flex items-center gap-2">
+              <label className="px-4 py-2 bg-white border border-slate-300 hover:border-indigo-400 text-slate-700 font-extrabold text-xs rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5">
+                <FileText className="h-4 w-4" />
+                {uploadingCsv ? 'Uploading…' : 'Upload CSV / Excel File'}
+                <input
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={handleUploadQuestionsCsv}
+                  disabled={uploadingCsv}
+                  className="hidden"
+                />
+              </label>
+
+              <button
+                onClick={() => {
+                  setIsNewQuestion(true);
+                  setEditingQuestion({
+                    id: `apex-q-${Date.now()}`,
+                    question: '',
+                    options: ['', '', '', ''],
+                    correctAnswer: 0,
+                    category: '',
+                    points: 2,
+                    examId: null
+                  });
+                }}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
+              >
+                <Plus className="h-4 w-4" /> Add Question
+              </button>
+            </div>
           </div>
+
+          {csvUploadError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-bold">
+              {csvUploadError}
+            </div>
+          )}
+          {csvUploadResult && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-bold space-y-1">
+              <p>
+                Loaded {csvUploadResult.inserted} of {csvUploadResult.totalRows} rows into the question pool
+                {csvUploadResult.skipped > 0 ? ` (${csvUploadResult.skipped} skipped)` : ''}.
+              </p>
+              {csvUploadResult.rowErrors.length > 0 && (
+                <ul className="list-disc list-inside text-[11px] text-emerald-900/80">
+                  {csvUploadResult.rowErrors.slice(0, 10).map((e, i) => (
+                    <li key={i}>Row {e.row}: {e.reason}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           <p className="text-xs text-slate-500">
             Questions live in a shared bank. Attach them to an exam from the Exams tab once you're ready to build a test.

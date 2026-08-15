@@ -153,6 +153,30 @@ export const deleteApexQuestion = async (id: string): Promise<boolean> => {
   return true;
 };
 
+export interface BulkQuestionUploadResult {
+  success: boolean;
+  inserted: number;
+  skipped: number;
+  totalRows: number;
+  rowErrors: { row: number; reason: string }[];
+}
+
+// CSV bulk-load of questions into the shared question bank. Same multipart
+// pattern as uploadApexCourseModuleDocument — no jsonHeaders, browser sets its own boundary.
+export const uploadApexQuestionsCsv = async (file: File, examId?: string | null): Promise<BulkQuestionUploadResult> => {
+  const formData = new FormData();
+  formData.append('csvFile', file);
+  if (examId) formData.append('examId', examId);
+
+  const res = await apiFetch('/apex/questions/bulk-upload-csv', {
+    method: 'POST',
+    body: formData
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to upload questions CSV');
+  return data;
+};
+
 // Payments (recordPaystackPayment intentionally omitted — legacy, no longer called by any frontend flow)
 export const getPaystackPayments = async (): Promise<PaystackPayment[]> => {
   const res = await apiFetch('/apex/paystack/history');

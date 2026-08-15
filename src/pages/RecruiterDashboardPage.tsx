@@ -236,8 +236,8 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
 
       {/* Post New Job Modal */}
       {isNewJobModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg p-6 relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto my-8">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <h3 className="font-bold text-slate-900 text-lg">Post New Job Opening</h3>
               <button onClick={() => setIsNewJobModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-600">

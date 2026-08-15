@@ -81,7 +81,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
           ref={editorRef}
           contentEditable
           onInput={handleInput}
-          className={`w-full p-2.5 text-xs leading-relaxed text-slate-800 focus:outline-none ${minHeightClass}`}
+          className={`w-full p-2.5 text-xs leading-relaxed text-slate-800 focus:outline-none overflow-y-auto max-h-[260px] ${minHeightClass}`}
           suppressContentEditableWarning
         />
       </div>
