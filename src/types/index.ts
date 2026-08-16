@@ -173,6 +173,8 @@ export interface ApexCourse {
   costKsh: number;
   passMarkPercent: number;
   isActive: boolean;
+  documentUrl?: string | null;
+  documentName?: string | null;
   modules?: ApexCourseModule[];
 }
 

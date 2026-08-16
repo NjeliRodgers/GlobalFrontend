@@ -66,8 +66,8 @@ export const deleteApexCourseModule = async (id: string): Promise<boolean> => {
   return true;
 };
 
-// PDF study material for a module. Deliberately not sending jsonHeaders here —
-// the browser needs to set its own multipart/form-data boundary.
+// Study material for a module (PDF or Word). Deliberately not sending
+// jsonHeaders here — the browser needs to set its own multipart/form-data boundary.
 export const uploadApexCourseModuleDocument = async (moduleId: string, file: File): Promise<ApexCourseModule> => {
   const formData = new FormData();
   formData.append('document', file);
@@ -77,8 +77,23 @@ export const uploadApexCourseModuleDocument = async (moduleId: string, file: Fil
     body: formData
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to upload the PDF');
+  if (!res.ok) throw new Error(data.error || 'Failed to upload the file');
   return data.module;
+};
+
+// Study material for the course itself (PDF or Word) — separate from any
+// per-module documents.
+export const uploadApexCourseDocument = async (courseId: string, file: File): Promise<ApexCourse> => {
+  const formData = new FormData();
+  formData.append('document', file);
+
+  const res = await apiFetch(`/apex/courses/${courseId}/document`, {
+    method: 'POST',
+    body: formData
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to upload the file');
+  return data.course;
 };
 
 // Packages

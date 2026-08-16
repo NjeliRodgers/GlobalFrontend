@@ -23,6 +23,7 @@ import {
   saveApexCourseModule,
   deleteApexCourseModule,
   uploadApexCourseModuleDocument,
+  uploadApexCourseDocument,
   getApexPackages,
   saveApexPackage,
   deleteApexPackage
@@ -46,7 +47,9 @@ import {
   Package,
   Award,
   CheckCircle2,
-  Clock3
+  Clock3,
+  Eye,
+  FileDown
 } from 'lucide-react';
 
 type Tab = 'exams' | 'courses' | 'packages' | 'interview_products' | 'questions' | 'financials' | 'certificates' | 'transcripts';
@@ -77,6 +80,8 @@ export const ApexRecruiterPage: React.FC = () => {
   const [editingModule, setEditingModule] = useState<ApexCourseModule | null>(null);
   const [uploadingDocFor, setUploadingDocFor] = useState<string | null>(null);
   const [docUploadError, setDocUploadError] = useState('');
+  const [uploadingCourseDoc, setUploadingCourseDoc] = useState(false);
+  const [courseDocUploadError, setCourseDocUploadError] = useState('');
 
   // Packages
   const [packages, setPackages] = useState<ApexPackage[]>([]);
@@ -189,6 +194,30 @@ export const ApexRecruiterPage: React.FC = () => {
       setDocUploadError(err.message || 'Failed to upload the PDF');
     } finally {
       setUploadingDocFor(null);
+    }
+  };
+
+  const ALLOWED_COURSE_DOC_TYPES = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ];
+
+  const handleUploadCourseDocument = async (courseId: string, file: File) => {
+    if (!ALLOWED_COURSE_DOC_TYPES.includes(file.type)) {
+      setCourseDocUploadError('Only PDF or Word (.doc/.docx) files are allowed.');
+      return;
+    }
+    setCourseDocUploadError('');
+    setUploadingCourseDoc(true);
+    try {
+      const updated = await uploadApexCourseDocument(courseId, file);
+      setEditingCourse((cur) => (cur && cur.id === courseId ? updated : cur));
+      await loadData();
+    } catch (err: any) {
+      setCourseDocUploadError(err.message || 'Failed to upload the file');
+    } finally {
+      setUploadingCourseDoc(false);
     }
   };
 
@@ -749,73 +778,73 @@ export const ApexRecruiterPage: React.FC = () => {
             </button>
           </div>
 
-          {editingCourse && (
-            <form onSubmit={handleSaveCourse} className="p-5 bg-slate-900 text-white rounded-2xl border border-slate-800 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <span className="font-extrabold text-sm text-sky-400">Course Details</span>
-                <button type="button" onClick={() => setEditingCourse(null)} className="p-1 text-slate-400 hover:text-white">
+{editingCourse && (
+            <form onSubmit={handleSaveCourse} className="p-5 bg-white text-slate-900 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                <span className="font-extrabold text-sm text-slate-900">Course Details</span>
+                <button type="button" onClick={() => setEditingCourse(null)} className="p-1 text-slate-400 hover:text-slate-900">
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Course Name</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Course Name</label>
                 <input
                   type="text"
                   value={editingCourse.name}
                   onChange={(e) => setEditingCourse({ ...editingCourse, name: e.target.value })}
                   placeholder="e.g. Workplace Communication Essentials"
                   required
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Category</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Category</label>
                   <input
                     type="text"
                     value={editingCourse.category || ''}
                     onChange={(e) => setEditingCourse({ ...editingCourse, category: e.target.value })}
                     placeholder="e.g. Soft Skills"
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Duration (days)</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Duration (days)</label>
                   <input
                     type="number"
                     min={1}
                     value={editingCourse.durationDays}
                     onChange={(e) => setEditingCourse({ ...editingCourse, durationDays: Number(e.target.value) })}
                     required
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Course Cost (KSh)</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Course Cost (KSh)</label>
                   <input
                     type="number"
                     min={1}
                     value={editingCourse.costKsh || ''}
                     onChange={(e) => setEditingCourse({ ...editingCourse, costKsh: Number(e.target.value) })}
                     required
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Description</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Description</label>
                 <textarea
                   value={editingCourse.description || ''}
                   onChange={(e) => setEditingCourse({ ...editingCourse, description: e.target.value })}
                   rows={2}
-                  className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
                 />
               </div>
 
-              <label className="flex items-center gap-2 text-xs font-bold text-slate-300">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
                 <input
                   type="checkbox"
                   checked={editingCourse.isActive}
@@ -824,9 +853,49 @@ export const ApexRecruiterPage: React.FC = () => {
                 Active (visible in the open catalog)
               </label>
 
+              <div className="border-t border-slate-200 pt-3">
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  Course Material (PDF or Word) - optional
+                </label>
+                <p className="text-[10px] text-slate-500 mb-2">
+                  Candidates can open and preview this file, or download it, while working through the course.
+                  Uploading a new file replaces the current one. Only a saved course (click "Save Course" first,
+                  then re-open it from the list below using the edit icon) can have a file attached. Added for sometime, but I will delete it 
+                </p>
+
+                {editingCourse.documentUrl && (
+                  <div className="flex items-center flex-wrap gap-3 mb-2">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
+                      <FileText className="h-3.5 w-3.5" />
+                      Current file: {editingCourse.documentName || 'document'}
+                    </span>
+                    <a href={"https://docs.google.com/viewer?url=" + encodeURIComponent(editingCourse.documentUrl) + "&embedded=true"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 hover:text-slate-900">
+                      <Eye className="h-3.5 w-3.5" /> View
+                    </a>
+                    <a href={editingCourse.documentUrl} download={editingCourse.documentName || 'course-material'} className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 hover:text-slate-900">
+                      <FileDown className="h-3.5 w-3.5" /> Download
+                    </a>
+                  </div>
+                )}
+
+                <input
+                  type="file"
+                  accept="application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  disabled={uploadingCourseDoc}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleUploadCourseDocument(editingCourse.id, file);
+                    e.target.value = '';
+                  }}
+                  className="block w-full text-[11px] text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-200 file:text-[11px] file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer"
+                />
+                {uploadingCourseDoc && <p className="text-[10px] text-slate-500 mt-1">Uploading...</p>}
+                {courseDocUploadError && <p className="text-[10px] text-rose-600 mt-1">{courseDocUploadError}</p>}
+              </div>
+
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
+                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
               >
                 <Save className="h-4 w-4" /> Save Course
               </button>
@@ -1072,27 +1141,27 @@ export const ApexRecruiterPage: React.FC = () => {
           )}
 
           {editingPackage && (
-            <form onSubmit={handleSavePackage} className="p-5 bg-slate-900 text-white rounded-2xl border border-slate-800 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <span className="font-extrabold text-sm text-amber-400">Package Details</span>
-                <button type="button" onClick={() => setEditingPackage(null)} className="p-1 text-slate-400 hover:text-white">
+            <form onSubmit={handleSavePackage} className="p-5 bg-white text-slate-900 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                <span className="font-extrabold text-sm text-slate-900">Package Details</span>
+                <button type="button" onClick={() => setEditingPackage(null)} className="p-1 text-slate-400 hover:text-slate-900">
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Package Name</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Package Name</label>
                 <input
                   type="text"
                   value={editingPackage.name}
                   onChange={(e) => setEditingPackage({ ...editingPackage, name: e.target.value })}
                   required
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
                 />
               </div>
 
-              <div className="bg-amber-950/40 border border-amber-800 rounded-xl px-4 py-3 space-y-2">
-                <label className="text-[10px] font-extrabold text-amber-400 uppercase tracking-wide block">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 space-y-2">
+                <label className="text-[10px] font-extrabold text-slate-600 uppercase tracking-wide block">
                   Package ID (you choose this)
                 </label>
                 <div className="flex items-center gap-2">
@@ -1105,30 +1174,30 @@ export const ApexRecruiterPage: React.FC = () => {
                     }}
                     placeholder="e.g. FHSORG"
                     maxLength={6}
-                    className="w-32 px-3 py-2 bg-slate-950 border border-amber-700 rounded-xl text-lg font-black text-amber-300 tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-32 px-3 py-2 bg-white border border-slate-300 rounded-xl text-lg font-black text-slate-900 tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-slate-500"
                   />
                   <button
                     type="button"
                     onClick={() => setEditingPackage({ ...editingPackage, packageId: suggestPackageId(packages) })}
-                    className="px-3 py-2 text-[10px] font-bold text-amber-300 bg-slate-950 border border-amber-700 rounded-lg hover:bg-amber-900/40 cursor-pointer whitespace-nowrap"
+                    className="px-3 py-2 text-[10px] font-bold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 cursor-pointer whitespace-nowrap"
                   >
                     Suggest ID
                   </button>
                 </div>
-                {packageIdError && <p className="text-[10px] text-rose-400 font-semibold">{packageIdError}</p>}
-                <p className="text-[10px] text-amber-400">
+                {packageIdError && <p className="text-[10px] text-rose-600 font-semibold">{packageIdError}</p>}
+                <p className="text-[10px] text-slate-500">
                   Up to 6 letters, automatically capitalized. Shown to candidates right after the package title.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Exam</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Exam</label>
                   <select
                     value={editingPackage.examId}
                     onChange={(e) => setEditingPackage({ ...editingPackage, examId: e.target.value })}
                     required
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
                   >
                     {exams.map((ex) => (
                       <option key={ex.id} value={ex.id}>{ex.name}</option>
@@ -1136,12 +1205,12 @@ export const ApexRecruiterPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Course</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Course</label>
                   <select
                     value={editingPackage.courseId}
                     onChange={(e) => setEditingPackage({ ...editingPackage, courseId: e.target.value })}
                     required
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
                   >
                     {courses.map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
@@ -1152,50 +1221,50 @@ export const ApexRecruiterPage: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Category</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Category</label>
                   <input
                     type="text"
                     value={editingPackage.category || ''}
                     onChange={(e) => setEditingPackage({ ...editingPackage, category: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Combined Package Cost (KSh)</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Combined Package Cost (KSh)</label>
                   <input
                     type="number"
                     min={1}
                     value={editingPackage.costKsh || ''}
                     onChange={(e) => setEditingPackage({ ...editingPackage, costKsh: Number(e.target.value) })}
                     required
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Description</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Description</label>
                 <textarea
                   value={editingPackage.description || ''}
                   onChange={(e) => setEditingPackage({ ...editingPackage, description: e.target.value })}
                   rows={2}
-                  className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Certificate Rule</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Certificate Rule</label>
                 <select
                   value={editingPackage.certificateRule}
                   onChange={(e) => setEditingPackage({ ...editingPackage, certificateRule: e.target.value as 'AND' | 'OR' })}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
                 >
                   <option value="AND">AND — candidate must complete both the exam and the course</option>
                   <option value="OR">OR — candidate can qualify by completing either one</option>
                 </select>
               </div>
 
-              <label className="flex items-center gap-2 text-xs font-bold text-slate-300">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
                 <input
                   type="checkbox"
                   checked={editingPackage.isActive}
@@ -1206,7 +1275,7 @@ export const ApexRecruiterPage: React.FC = () => {
 
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
+                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
               >
                 <Save className="h-4 w-4" /> Save Package
               </button>

@@ -34,10 +34,10 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
   // New Job Modal State
   const [isNewJobModalOpen, setIsNewJobModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
-  const [newDepartment, setNewDepartment] = useState('Engineering');
-  const [newLocation, setNewLocation] = useState('San Francisco, CA (Hybrid)');
-  const [newWorkType, setNewWorkType] = useState('Hybrid');
-  const [newSalary, setNewSalary] = useState('$130,000 - $170,000 / yr');
+  const [newDepartment, setNewDepartment] = useState('  ');
+  const [newLocation, setNewLocation] = useState(' ');
+  const [newWorkType, setNewWorkType] = useState(' ');
+  const [newSalary, setNewSalary] = useState('ksh.130,000 - KSh.170,000 / month');
   const [newDescription, setNewDescription] = useState('');
   const [newApexExamId, setNewApexExamId] = useState('');
   const [newJobError, setNewJobError] = useState('');
