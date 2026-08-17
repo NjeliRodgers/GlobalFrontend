@@ -25,7 +25,7 @@ const NAV_ITEMS = [
   { tab: 'email_logs', label: ' Email Logs and Archive', icon: Mail, iconColor: 'text-amber-400' },
   { tab: 'document_vault', label: ' Document storage Vault', icon: FolderLock, iconColor: 'text-sky-400' },
   { tab: 'team_rbac', label: 'RBAC & Team Access Control', icon: ShieldCheck, iconColor: 'text-rose-400' },
-  { tab: 'apex_recruiter', label: 'Apex System Admin Control', icon: Sliders, iconColor: 'text-purple-400' },
+  { tab: 'apex_recruiter', label: 'Atesta System Admin Control', icon: Sliders, iconColor: 'text-purple-400' },
 ];
 
 const CANDIDATE_NAV_ITEMS = [

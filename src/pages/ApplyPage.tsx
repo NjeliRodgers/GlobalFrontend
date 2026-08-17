@@ -66,10 +66,10 @@ const COMPLIANCE_QUESTIONS: ComplianceQuestion[] = [
   },
   {
     id: 'hasApexCertificate',
-    label: 'Have you completed any Apex Training Certification required in this role?',
+    label: 'Have you completed any Atesta Training Certification required in this role?',
     icon: <Award className="h-4 w-4" />,
     needsUploadOnYes: true,
-    uploadLabel: 'Upload Apex Assessment Certificate',
+    uploadLabel: 'Upload Atesta Assessment Certificate',
     uploadAccept: '.pdf,.png,.jpg',
     uploadFileType: 'certificate'
   },

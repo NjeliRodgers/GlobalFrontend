@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Job, Application } from '../types';
 import { fetchJobs, createJob } from '../api/jobsApi';
 import { fetchApplications } from '../api/applicationsApi';
+import { getApexPackages } from '../api/apexAssessmentApi';
 import { RichTextEditor } from '../components/RichTextEditor';
 import {
   Users,
@@ -29,6 +30,7 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
 }) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [packages, setPackages] = useState<Array<{ id: string; packageId?: string; name: string; examId: string; isActive: boolean }>>([]);
   const [loading, setLoading] = useState(true);
 
   // New Job Modal State
@@ -39,7 +41,7 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
   const [newWorkType, setNewWorkType] = useState(' ');
   const [newSalary, setNewSalary] = useState('ksh.130,000 - KSh.170,000 / month');
   const [newDescription, setNewDescription] = useState('');
-  const [newApexExamId, setNewApexExamId] = useState('');
+  const [newApexPackageId, setNewApexPackageId] = useState('');
   const [newJobError, setNewJobError] = useState('');
 
   useEffect(() => {
@@ -48,16 +50,27 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
 
   const loadDashboardData = async () => {
     setLoading(true);
-    const [jobsData, appsData] = await Promise.all([fetchJobs(), fetchApplications()]);
+    const [jobsData, appsData, packagesData] = await Promise.all([fetchJobs(), fetchApplications(), getApexPackages()]);
     setJobs(jobsData);
     setApplications(appsData);
+    setPackages((packagesData || []).filter((p) => p.isActive));
     setLoading(false);
   };
 
   const handleCreateJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle || !newDepartment) return;
+    if (!newApexPackageId) {
+      setNewJobError('Please choose a package before publishing this job.');
+      return;
+    }
     setNewJobError('');
+
+    const selectedPackage = packages.find((p) => p.id === newApexPackageId);
+    if (!selectedPackage) {
+      setNewJobError('Selected package could not be found. Refresh and try again.');
+      return;
+    }
 
     try {
       await createJob({
@@ -71,16 +84,17 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
         requirements: ['Proven experience in domain engineering.', 'Strong communication and analytical skills.'],
         benefits: ['Health, Dental, Vision', 'Competitive salary & bonus'],
         status: 'active',
-        apexExamId: newApexExamId.trim()
+        apexPackageId: selectedPackage.id,
+        apexExamId: selectedPackage.examId
       });
 
       setIsNewJobModalOpen(false);
       setNewTitle('');
       setNewDescription('');
-      setNewApexExamId('');
+      setNewApexPackageId('');
       loadDashboardData();
     } catch (err: any) {
-      setNewJobError(err.message || 'Failed to post job. Check the Exam ID and try again.');
+      setNewJobError(err.message || 'Failed to post job. Check the selected package and try again.');
     }
   };
 
@@ -310,18 +324,22 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Exam ID</label>
-                <input
-                  type="text"
-                  value={newApexExamId}
-                  onChange={(e) => setNewApexExamId(e.target.value)}
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Assessment Package</label>
+                <select
+                  value={newApexPackageId}
+                  onChange={(e) => setNewApexPackageId(e.target.value)}
                   required
-                  placeholder="e.g. 56743"
-                  maxLength={5}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+                >
+                  <option value="">Select a package</option>
+                  {packages.map((pkg) => (
+                    <option key={pkg.id} value={pkg.id}>
+                      {pkg.packageId ? `${pkg.packageId} - ` : ''}{pkg.name}
+                    </option>
+                  ))}
+                </select>
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Must match a 5-digit Exam ID already created in Exam Builder — the job won't post otherwise.
+                  Choose an active package. The system uses its linked package ID and mapped exam automatically.
                 </p>
               </div>
 

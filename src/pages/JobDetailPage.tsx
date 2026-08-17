@@ -154,7 +154,7 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ job, onBack, onApp
             </div>
             <h4 className="font-bold text-sm">Automated Hiring Process</h4>
             <p className="text-xs text-indigo-200 leading-relaxed">
-              Upon submitting your application and documents, you'll receive an immediate confirmation email. Once our Talent acquisition team has reviewed your CV, we'll follow up by email with next steps and If you don't have an Apex certificate, you'll be directed to take the Apex certification program which is a prerequisite for the next stage of the hiring process. The link will be provided in the follow-up email.
+              Upon submitting your application and documents, you'll receive an immediate confirmation email. Once our Talent acquisition team has reviewed your CV, we'll follow up by email with next steps and if you don't have an Atesta certificate, you'll be directed to take the Atesta certification program, which is a prerequisite for the next stage of the hiring process. The link will be provided in the follow-up email.
             </p>
             <button
               onClick={handleApplyClick}
