@@ -108,30 +108,6 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ job, onBack, onApp
               dangerouslySetInnerHTML={{ __html: job.description }}
             />
           </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-            <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-2">Key Responsibilities</h3>
-            <ul className="space-y-2.5">
-              {job.responsibilities.map((resp, idx) => (
-                <li key={idx} className="flex items-start gap-2.5 text-sm text-slate-700">
-                  <CheckCircle2 className="h-4 w-4 text-indigo-600 shrink-0 mt-0.5" />
-                  <span>{resp}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
-            <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-2">Requirements & Qualifications</h3>
-            <ul className="space-y-2.5">
-              {job.requirements.map((req, idx) => (
-                <li key={idx} className="flex items-start gap-2.5 text-sm text-slate-700">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span>{req}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
         </div>
 
         {/* Sidebar Info */}
