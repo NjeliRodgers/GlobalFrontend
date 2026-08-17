@@ -45,6 +45,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
 
   const items = isRecruiterOrAdmin ? NAV_ITEMS : CANDIDATE_NAV_ITEMS;
   const sectionLabel = isRecruiterOrAdmin ? 'Global Talent Plus Operations' : 'My Sponsorship';
+  const mobileCandidateVisibility = isCandidate
+    ? isOpen
+      ? 'translate-x-0'
+      : '-translate-x-full'
+    : 'translate-x-0';
 
   return (
     <>
@@ -54,7 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
       )}
 
       <aside
-        className={`fixed md:sticky top-16 z-40 h-[calc(100vh-4rem)] bg-slate-900 text-white flex flex-col justify-between border-r border-slate-800 shrink-0 transition-all duration-200 ${
+        className={`fixed md:sticky top-16 z-40 h-[calc(100vh-4rem)] bg-slate-900 text-white flex flex-col justify-between border-r border-slate-800 shrink-0 transform transition-[width,transform] duration-200 ${mobileCandidateVisibility} ${
           isOpen ? 'w-64' : 'w-[72px]'
         }`}
       >
