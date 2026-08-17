@@ -30,7 +30,7 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
 }) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
-  const [packages, setPackages] = useState<Array<{ id: string; packageId?: string; name: string; examId: string; isActive: boolean }>>([]);
+  const [packages, setPackages] = useState<Array<{ id: string; packageId?: string; name: string; isActive: boolean }>>([]);
   const [loading, setLoading] = useState(true);
 
   // New Job Modal State
@@ -66,7 +66,7 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
     }
     setNewJobError('');
 
-    const selectedPackage = packages.find((p) => p.id === newApexPackageId);
+    const selectedPackage = packages.find((p) => p.id === newApexPackageId || p.packageId === newApexPackageId);
     if (!selectedPackage) {
       setNewJobError('Selected package could not be found. Refresh and try again.');
       return;
@@ -84,8 +84,7 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
         requirements: ['Proven experience in domain engineering.', 'Strong communication and analytical skills.'],
         benefits: ['Health, Dental, Vision', 'Competitive salary & bonus'],
         status: 'active',
-        apexPackageId: selectedPackage.id,
-        apexExamId: selectedPackage.examId
+        apexPackageId: selectedPackage.packageId || selectedPackage.id
       });
 
       setIsNewJobModalOpen(false);
@@ -333,13 +332,13 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
                 >
                   <option value="">Select a package</option>
                   {packages.map((pkg) => (
-                    <option key={pkg.id} value={pkg.id}>
+                    <option key={pkg.id} value={pkg.packageId || pkg.id}>
                       {pkg.packageId ? `${pkg.packageId} - ` : ''}{pkg.name}
                     </option>
                   ))}
                 </select>
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Choose an active package. The system uses its linked package ID and mapped exam automatically.
+                  Choose an active package. The selected Package ID is used automatically to map assessment flow.
                 </p>
               </div>
 
