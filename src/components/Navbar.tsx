@@ -97,16 +97,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, activeTab, setA
                 >
                   Hiring Pipeline
                 </button>
-                <button
-                  onClick={() => setActiveTab('candidates_directory')}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
-                    activeTab === 'candidates_directory'
-                      ? 'bg-indigo-50 text-indigo-700'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  Candidates
-                </button>
               </>
             )}
 
