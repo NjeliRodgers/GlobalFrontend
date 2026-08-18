@@ -32,6 +32,7 @@ interface ComplianceQuestion {
   label: string;
   icon: React.ReactNode;
   needsUploadOnYes?: boolean;
+  optionalUploadOnYes?: boolean;
   uploadLabel?: string;
   uploadAccept?: string;
   uploadFileType?: SubmittedDocument['fileType'];
@@ -72,6 +73,16 @@ const COMPLIANCE_QUESTIONS: ComplianceQuestion[] = [
     uploadLabel: 'Upload Atesta Assessment Certificate',
     uploadAccept: '.pdf,.png,.jpg',
     uploadFileType: 'certificate'
+  },
+  {
+    id: 'hasGoodConduct',
+    label: 'Do you have a Good Conduct certificate?',
+    icon: <ShieldCheck className="h-4 w-4" />,
+    needsUploadOnYes: true,
+    optionalUploadOnYes: true,
+    uploadLabel: 'Upload Good Conduct Certificate (Optional)',
+    uploadAccept: '.pdf,.png,.jpg',
+    uploadFileType: 'good_conduct'
   },
   {
     id: 'willingToRelocate',
@@ -186,7 +197,7 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack }) => {
   const complianceIncomplete = COMPLIANCE_QUESTIONS.some((q) => {
     const answer = complianceAnswers[q.id];
     if (answer === null) return true;
-    if (answer === 'yes' && q.needsUploadOnYes && !complianceFiles[q.id]) return true;
+    if (answer === 'yes' && q.needsUploadOnYes && !q.optionalUploadOnYes && !complianceFiles[q.id]) return true;
     return false;
   });
 
@@ -551,7 +562,7 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack }) => {
               </h3>
               <p className="text-xs text-slate-500 pt-2">
                 Every question is required (*). Answering "Yes" on some questions will ask you to attach supporting
-                documentation.
+                documentation. Good Conduct upload is optional if available.
               </p>
             </div>
 
@@ -588,7 +599,7 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack }) => {
                       <div>
                         <div className="border border-dashed border-slate-300 rounded-xl p-3 bg-white text-center space-y-1">
                           <span className="block text-[11px] font-bold text-slate-800">
-                            {q.uploadLabel} <span className="text-rose-600">*</span>
+                            {q.uploadLabel} {!q.optionalUploadOnYes && <span className="text-rose-600">*</span>}
                           </span>
                           <input
                             type="file"

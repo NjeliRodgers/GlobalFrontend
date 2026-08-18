@@ -70,7 +70,7 @@ export interface SubmittedDocument {
   id: string;
   applicationId: string;
   fileName: string;
-  fileType: 'resume' | 'id_card' | 'cover_letter' | 'certificate' | 'passport' | 'covid_cover' | 'other';
+  fileType: 'resume' | 'id_card' | 'cover_letter' | 'certificate' | 'passport' | 'covid_cover' | 'good_conduct' | 'other';
   fileSize: string;
   uploadedAt: string;
   encryptedHash: string;

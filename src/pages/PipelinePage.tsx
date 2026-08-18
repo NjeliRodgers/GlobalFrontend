@@ -39,6 +39,7 @@ const COMPLIANCE_LABELS: Record<string, string> = {
   hasForeignExperience: 'Has worked in a foreign country before',
   hasPassport: 'Has a valid passport',
   hasApexCertificate: 'Completed required Atesta training certification',
+  hasGoodConduct: 'Has a Good Conduct certificate',
   willingToRelocate: 'Willing to relocate internationally',
   hasLegalRestrictions: 'Has legal/immigration restrictions for working abroad'
 };
