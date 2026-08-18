@@ -8,7 +8,8 @@ import {
   ShieldCheck,
   FolderLock,
   Sliders,
-  Wallet
+  Wallet,
+  UserRoundSearch
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -21,6 +22,7 @@ interface SidebarProps {
 const NAV_ITEMS = [
   { tab: 'recruiter_dashboard', label: 'Recruiter Dashboard', icon: Briefcase, iconColor: 'text-[#5b8bb5]' },
   { tab: 'pipeline', label: 'Candidate Hiring Pipeline', icon: Layers, iconColor: 'text-[#5b8bb5]' },
+  { tab: 'candidates_directory', label: 'Candidate Directory', icon: UserRoundSearch, iconColor: 'text-cyan-300' },
   { tab: 'interviews', label: 'Interview Scheduling Center', icon: Calendar, iconColor: 'text-emerald-400' },
   { tab: 'email_logs', label: ' Email Logs and Archive', icon: Mail, iconColor: 'text-amber-400' },
   { tab: 'document_vault', label: ' Document storage Vault', icon: FolderLock, iconColor: 'text-sky-400' },

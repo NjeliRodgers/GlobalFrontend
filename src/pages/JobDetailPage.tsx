@@ -9,7 +9,8 @@ import {
   Users,
   CheckCircle2,
   ShieldCheck,
-  Calendar
+  Calendar,
+  ArrowRight
 } from 'lucide-react';
 
 interface JobDetailPageProps {
@@ -66,10 +67,11 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ job, onBack, onApp
             className={
               isAuthenticated && alreadyApplied
                 ? 'px-6 py-3 bg-slate-100 text-slate-400 font-semibold text-sm tracking-wide rounded-lg cursor-not-allowed shrink-0'
-                : 'px-6 py-3 bg-[#1f4e79] hover:bg-[#102a43] text-white font-semibold text-sm tracking-wide rounded-lg shadow-md transition cursor-pointer shrink-0'
+                : 'inline-flex items-center gap-2 px-6 py-3 bg-[#1f4e79] hover:bg-[#102a43] text-white font-semibold text-sm tracking-wide rounded-lg shadow-md transition cursor-pointer shrink-0'
             }
           >
             {isAuthenticated && alreadyApplied ? 'Already Applied' : 'Apply For Position'}
+            {!(isAuthenticated && alreadyApplied) && <ArrowRight className="h-4 w-4" />}
           </button>
         </div>
 
@@ -124,19 +126,32 @@ export const JobDetailPage: React.FC<JobDetailPageProps> = ({ job, onBack, onApp
             </ul>
           </div>
 
-          <div className="bg-[#102a43] rounded-2xl p-6 text-white space-y-3 shadow-md">
-            <div className="p-2 bg-white/10 text-[#c3d3e2] rounded-xl w-fit">
-              <ShieldCheck className="h-5 w-5" />
+          <div className="bg-[#102a43] rounded-2xl p-4 text-white shadow-md">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2.5 min-w-0">
+                <div className="p-1.5 bg-white/10 text-[#c3d3e2] rounded-lg shrink-0">
+                  <ShieldCheck className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="font-bold text-sm leading-tight">Automated Hiring Process</h4>
+                  <p className="text-[11px] text-indigo-200 leading-snug mt-1">
+                    Submit once, receive confirmation instantly, and get next-step guidance by email after CV review.
+                  </p>
+                </div>
+              </div>
             </div>
-            <h4 className="font-bold text-sm">Automated Hiring Process</h4>
-            <p className="text-xs text-indigo-200 leading-relaxed">
-              Upon submitting your application and documents, you'll receive an immediate confirmation email. Once our Talent acquisition team has reviewed your CV, we'll follow up by email with next steps and if you don't have an Atesta certificate, you'll be directed to take the Atesta certification program, which is a prerequisite for the next stage of the hiring process. The link will be provided in the follow-up email.
-            </p>
+
             <button
               onClick={handleApplyClick}
-              className="w-full py-2.5 bg-white hover:bg-slate-100 text-indigo-900 font-bold text-xs rounded-xl transition cursor-pointer mt-2"
+              disabled={isAuthenticated && alreadyApplied}
+              className={
+                isAuthenticated && alreadyApplied
+                  ? 'mt-3 w-full py-2 bg-slate-300/80 text-slate-500 font-bold text-xs rounded-lg cursor-not-allowed'
+                  : 'mt-3 w-full inline-flex items-center justify-center gap-1.5 py-2 bg-amber-300 hover:bg-amber-200 text-slate-900 font-extrabold text-xs rounded-lg transition cursor-pointer'
+              }
             >
-              Start Application
+              {isAuthenticated && alreadyApplied ? 'Already Applied' : 'Tap to Start Application'}
+              {!(isAuthenticated && alreadyApplied) && <ArrowRight className="h-3.5 w-3.5" />}
             </button>
           </div>
         </div>

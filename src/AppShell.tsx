@@ -18,6 +18,7 @@ import { InterviewSchedulerPage } from './pages/InterviewSchedulerPage';
 import { EmailLogsPage } from './pages/EmailLogsPage';
 import { DocumentVaultPage } from './pages/DocumentVaultPage';
 import { TeamRbacPage } from './pages/TeamRbacPage';
+import { CandidatesDirectoryPage } from './pages/CandidatesDirectoryPage';
 import { fetchJobById } from './api/jobsApi';
 import { ActivateAccount } from './auth/ActivateAccount';
 import { ResetPasswordForm } from './auth/ResetPasswordForm';
@@ -184,6 +185,8 @@ export const AppShell: React.FC = () => {
           {activeTab === 'document_vault' && <DocumentVaultPage />}
 
           {activeTab === 'team_rbac' && <TeamRbacPage />}
+
+          {activeTab === 'candidates_directory' && <CandidatesDirectoryPage />}
         </main>
       </div>
 
