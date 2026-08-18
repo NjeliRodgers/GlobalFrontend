@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Job, SubmittedDocument } from '../types';
 import { useAuth } from '../auth/AuthContext';
-import { submitApplication, fetchApplications } from '../api/applicationsApi';
+import { submitApplication, fetchApplications, uploadApplicationDocument } from '../api/applicationsApi';
 import { isValidEmail, isValidPhone, EMAIL_ERROR_MESSAGE, PHONE_ERROR_MESSAGE } from '../utils/validators';
 import {
   User,
@@ -202,71 +202,29 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack }) => {
     setError('');
 
     try {
-      const documentsList: SubmittedDocument[] = [
-        {
-          id: `doc-${Date.now()}-resume`,
-          applicationId: '',
-          fileName: resumeFile ? resumeFile.name : `${candidateName.replace(/\s+/g, '_')}_Resume.pdf`,
-          fileType: 'resume' as const,
-          fileSize: resumeFile ? `${(resumeFile.size / 1024 / 1024).toFixed(1)} MB` : '1.4 MB',
-          uploadedAt: new Date().toISOString(),
-          encryptedHash: `sha256-aes256-${Math.random().toString(36).substring(2, 10)}`,
-          status: 'verified' as const
-        },
-        {
-          id: `doc-${Date.now()}-id`,
-          applicationId: '',
-          fileName: idFile ? idFile.name : `${candidateName.replace(/\s+/g, '_')}_National_ID_Proof.pdf`,
-          fileType: 'id_card' as const,
-          fileSize: idFile ? `${(idFile.size / 1024 / 1024).toFixed(1)} MB` : '2.2 MB',
-          uploadedAt: new Date().toISOString(),
-          encryptedHash: `sha256-aes256-${Math.random().toString(36).substring(2, 10)}`,
-          status: 'verified' as const
-        }
+      if (!resumeFile || !idFile) {
+        throw new Error('Resume/CV and National ID/Passport are required.');
+      }
+
+      const uploads: Array<{ file: File; fileType: SubmittedDocument['fileType'] }> = [
+        { file: resumeFile, fileType: 'resume' },
+        { file: idFile, fileType: 'id_card' }
       ];
 
-      if (coverLetterFile) {
-        documentsList.push({
-          id: `doc-${Date.now()}-cover`,
-          applicationId: '',
-          fileName: coverLetterFile.name,
-          fileType: 'cover_letter' as const,
-          fileSize: `${(coverLetterFile.size / 1024 / 1024).toFixed(1)} MB`,
-          uploadedAt: new Date().toISOString(),
-          encryptedHash: `sha256-aes256-${Math.random().toString(36).substring(2, 10)}`,
-          status: 'verified' as const
-        });
-      }
+      if (coverLetterFile) uploads.push({ file: coverLetterFile, fileType: 'cover_letter' });
+      if (certificateFile) uploads.push({ file: certificateFile, fileType: 'certificate' });
 
-      if (certificateFile) {
-        documentsList.push({
-          id: `doc-${Date.now()}-cert`,
-          applicationId: '',
-          fileName: certificateFile.name,
-          fileType: 'certificate' as const,
-          fileSize: `${(certificateFile.size / 1024 / 1024).toFixed(1)} MB`,
-          uploadedAt: new Date().toISOString(),
-          encryptedHash: `sha256-aes256-${Math.random().toString(36).substring(2, 10)}`,
-          status: 'verified' as const
-        });
-      }
-
-      // Phase 6: any compliance-question uploads (COVID cover, passport, an
-      // already-earned Apex certificate) become documents too.
       for (const q of COMPLIANCE_QUESTIONS) {
         const file = complianceFiles[q.id];
         if (file && q.uploadFileType) {
-          documentsList.push({
-            id: `doc-${Date.now()}-${q.id}`,
-            applicationId: '',
-            fileName: file.name,
-            fileType: q.uploadFileType,
-            fileSize: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
-            uploadedAt: new Date().toISOString(),
-            encryptedHash: `sha256-aes256-${Math.random().toString(36).substring(2, 10)}`,
-            status: 'verified' as const
-          });
+          uploads.push({ file, fileType: q.uploadFileType });
         }
+      }
+
+      const uploadedDocuments: SubmittedDocument[] = [];
+      for (const item of uploads) {
+        const uploaded = await uploadApplicationDocument(item.file, item.fileType);
+        uploadedDocuments.push(uploaded);
       }
 
       await submitApplication({
@@ -281,7 +239,7 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack }) => {
         currentCompany,
         linkedinUrl: isTechRole ? linkedinUrl : undefined,
         portfolioUrl: isTechRole ? portfolioUrl : undefined,
-        documents: documentsList,
+        documents: uploadedDocuments,
         complianceAnswers
       });
 

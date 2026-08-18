@@ -1,34 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Application, ApplicationStage } from '../types';
-import { fetchApplications, updateApplicationStage, bulkUpdateApplicationStages } from '../api/applicationsApi';
+import { fetchApplications, updateApplicationStage } from '../api/applicationsApi';
 import { StatusBadge } from '../components/StatusBadge';
-import { BulkActionModal } from '../components/BulkActionModal';
 import { ScheduleInterviewModal } from '../components/ScheduleInterviewModal';
 import { scheduleInterview } from '../api/interviewsApi';
 import {
   Search,
   MapPin,
   Filter,
-  CheckSquare,
-  Square,
   X,
   FileText,
-  Lock,
+  ExternalLink,
+  ClipboardCheck,
   Award,
-  Calendar,
-  Layers,
   ChevronRight,
-  UserCheck,
-  Send
+  Calendar,
+  UserRound
 } from 'lucide-react';
 
 interface PipelinePageProps {
   initialJobId?: string;
 }
 
-const KANBAN_STAGES: ApplicationStage[] = [
+const STAGES: ApplicationStage[] = [
   'Submitted',
   'Assessment Passed',
+  'Assessment Failed',
   'Screening',
   'Technical Interview',
   'Final Interview',
@@ -37,21 +34,24 @@ const KANBAN_STAGES: ApplicationStage[] = [
   'Rejected'
 ];
 
+const COMPLIANCE_LABELS: Record<string, string> = {
+  hasCovidCover: 'Has COVID-19 medical cover',
+  hasForeignExperience: 'Has worked in a foreign country before',
+  hasPassport: 'Has a valid passport',
+  hasApexCertificate: 'Completed required Atesta training certification',
+  willingToRelocate: 'Willing to relocate internationally',
+  hasLegalRestrictions: 'Has legal/immigration restrictions for working abroad'
+};
+
 export const PipelinePage: React.FC<PipelinePageProps> = ({ initialJobId }) => {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLocation, setSelectedLocation] = useState('');
   const [selectedStage, setSelectedStage] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState('');
 
-  // Selection & Bulk Modal
-  const [selectedAppIds, setSelectedAppIds] = useState<string[]>([]);
-  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
-
-  // Candidate Drawer & Schedule Modal
-  const [inspectApp, setInspectApp] = useState<Application | null>(null);
+  const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [scheduleModalApp, setScheduleModalApp] = useState<Application | null>(null);
 
   useEffect(() => {
@@ -65,97 +65,69 @@ export const PipelinePage: React.FC<PipelinePageProps> = ({ initialJobId }) => {
     setLoading(false);
   };
 
-  // Unique Locations
-  const locations = Array.from(new Set(applications.map((a) => a.candidateLocation)));
+  const locations = useMemo(
+    () => Array.from(new Set(applications.map((a) => a.candidateLocation).filter(Boolean))),
+    [applications]
+  );
 
-  // Filtered List
-  const filteredApps = applications.filter((app) => {
-    const matchesSearch =
-      app.candidateName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.jobTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.candidateEmail.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredApps = useMemo(
+    () =>
+      applications.filter((app) => {
+        const query = searchQuery.trim().toLowerCase();
+        const matchesSearch =
+          !query ||
+          app.candidateName.toLowerCase().includes(query) ||
+          app.candidateEmail.toLowerCase().includes(query) ||
+          app.jobTitle.toLowerCase().includes(query) ||
+          app.id.toLowerCase().includes(query);
 
-    const matchesLocation = !selectedLocation || app.candidateLocation.toLowerCase().includes(selectedLocation.toLowerCase());
-    const matchesStage = !selectedStage || app.stage === selectedStage;
+        const matchesStage = !selectedStage || app.stage === selectedStage;
+        const matchesLocation =
+          !selectedLocation || app.candidateLocation.toLowerCase().includes(selectedLocation.toLowerCase());
 
-    return matchesSearch && matchesLocation && matchesStage;
-  });
+        return matchesSearch && matchesStage && matchesLocation;
+      }),
+    [applications, searchQuery, selectedStage, selectedLocation]
+  );
 
-  const toggleSelectApp = (id: string) => {
-    setSelectedAppIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedAppIds.length === filteredApps.length) {
-      setSelectedAppIds([]);
-    } else {
-      setSelectedAppIds(filteredApps.map((a) => a.id));
-    }
-  };
-
-  const handleApplyBulkStage = async (newStage: ApplicationStage) => {
-    if (selectedAppIds.length === 0) return;
-    await bulkUpdateApplicationStages(selectedAppIds, newStage);
-    setSelectedAppIds([]);
-    loadApplications();
-  };
-
-  const handleStageChangeSingle = async (appId: string, newStage: ApplicationStage) => {
-    await updateApplicationStage(appId, newStage, `Moved to ${newStage} from Kanban board`);
-    loadApplications();
-    if (inspectApp && inspectApp.id === appId) {
-      setInspectApp({ ...inspectApp, stage: newStage });
+  const handleStageChange = async (appId: string, stage: ApplicationStage) => {
+    await updateApplicationStage(appId, stage, `Moved to ${stage} from recruiter applicants table`);
+    await loadApplications();
+    if (selectedApp?.id === appId) {
+      setSelectedApp((prev) => (prev ? { ...prev, stage } : prev));
     }
   };
 
   const handleConfirmScheduleInterview = async (data: any) => {
     await scheduleInterview(data);
-    loadApplications();
+    await loadApplications();
   };
 
   return (
     <div className="space-y-6">
-      {/* Header Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md uppercase tracking-wider mb-1 inline-block">
-            Talent Pipeline Kanban & Bulk Actions
-          </span>
-          <h1 className="text-2xl font-extrabold text-slate-900">Candidate Stage Management</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Bulk edit applicant statuses, filter candidates by location, review uploaded IDs/Resumes, and trigger interview invites.
-          </p>
-        </div>
-
-        {selectedAppIds.length > 0 && (
-          <button
-            onClick={() => setIsBulkModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer"
-          >
-            <Layers className="h-4 w-4" />
-            <span>Bulk Edit Status ({selectedAppIds.length} Selected)</span>
-          </button>
-        )}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+        <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md uppercase tracking-wider mb-1 inline-block">
+          Recruiter Applicant Explorer
+        </span>
+        <h1 className="text-2xl font-extrabold text-slate-900">Application Review Table</h1>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Review all submitted applications, open a full answer breakdown, and access every uploaded document URL in one place.
+        </p>
       </div>
 
-      {/* Filtering Toolbar */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search candidates, positions, email..."
+              placeholder="Search candidate, email, role, or ref..."
               className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
-          {/* Filter by Location */}
           <div className="relative">
             <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <select
@@ -163,7 +135,7 @@ export const PipelinePage: React.FC<PipelinePageProps> = ({ initialJobId }) => {
               onChange={(e) => setSelectedLocation(e.target.value)}
               className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none cursor-pointer"
             >
-              <option value="">Filter By Location (All Locations)</option>
+              <option value="">All Locations</option>
               {locations.map((loc) => (
                 <option key={loc} value={loc}>
                   {loc}
@@ -172,7 +144,6 @@ export const PipelinePage: React.FC<PipelinePageProps> = ({ initialJobId }) => {
             </select>
           </div>
 
-          {/* Filter by Stage */}
           <div className="relative">
             <Filter className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
             <select
@@ -180,272 +151,224 @@ export const PipelinePage: React.FC<PipelinePageProps> = ({ initialJobId }) => {
               onChange={(e) => setSelectedStage(e.target.value)}
               className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none cursor-pointer"
             >
-              <option value="">All Pipeline Stages</option>
-              {KANBAN_STAGES.map((stg) => (
-                <option key={stg} value={stg}>
-                  {stg}
+              <option value="">All Stages</option>
+              {STAGES.map((stage) => (
+                <option key={stage} value={stage}>
+                  {stage}
                 </option>
               ))}
             </select>
           </div>
         </div>
-
-        {/* Multi-select check all toolbar */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-          <button
-            onClick={toggleSelectAll}
-            className="text-slate-700 font-semibold hover:text-indigo-600 flex items-center gap-1.5 cursor-pointer"
-          >
-            {selectedAppIds.length === filteredApps.length && filteredApps.length > 0 ? (
-              <CheckSquare className="h-4 w-4 text-indigo-600" />
-            ) : (
-              <Square className="h-4 w-4 text-slate-400" />
-            )}
-            <span>Select All Filtered Candidates ({filteredApps.length})</span>
-          </button>
-
-          {(searchQuery || selectedLocation || selectedStage) && (
-            <button
-              onClick={() => {
-                setSearchQuery('');
-                setSelectedLocation('');
-                setSelectedStage('');
-              }}
-              className="text-indigo-600 hover:underline font-semibold cursor-pointer"
-            >
-              Clear Filters
-            </button>
-          )}
-        </div>
       </div>
 
-      {/* Kanban Stages Columns */}
-      {loading ? (
-        <div className="py-12 text-center text-xs text-slate-400">Loading pipeline candidates...</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 overflow-x-auto pb-4">
-          {KANBAN_STAGES.map((stage) => {
-            const stageApps = filteredApps.filter((a) => a.stage === stage);
-            return (
-              <div key={stage} className="bg-slate-100/70 border border-slate-200 rounded-2xl p-3 flex flex-col min-h-[350px]">
-                {/* Column Header */}
-                <div className="flex items-center justify-between pb-2.5 mb-3 border-b border-slate-200">
-                  <span className="font-extrabold text-xs text-slate-800">{stage}</span>
-                  <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 font-bold text-[11px] flex items-center justify-center">
-                    {stageApps.length}
-                  </span>
-                </div>
-
-                {/* Candidates List in Stage */}
-                <div className="space-y-2.5 flex-1 overflow-y-auto">
-                  {stageApps.map((app) => {
-                    const isSelected = selectedAppIds.includes(app.id);
-                    return (
-                      <div
-                        key={app.id}
-                        className={`bg-white rounded-xl border p-3.5 shadow-2xs hover:shadow-md transition space-y-2 relative group ${
-                          isSelected ? 'border-indigo-600 ring-2 ring-indigo-500/20' : 'border-slate-200 hover:border-indigo-300'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-start gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleSelectApp(app.id);
-                              }}
-                              className="mt-0.5 text-slate-400 hover:text-indigo-600 cursor-pointer"
-                            >
-                              {isSelected ? (
-                                <CheckSquare className="h-4 w-4 text-indigo-600" />
-                              ) : (
-                                <Square className="h-4 w-4" />
-                              )}
-                            </button>
-                            <div>
-                              <h4
-                                onClick={() => setInspectApp(app)}
-                                className="font-bold text-slate-900 text-xs hover:text-indigo-600 transition cursor-pointer"
-                              >
-                                {app.candidateName}
-                              </h4>
-                              <p className="text-[11px] text-slate-500 font-medium">{app.jobTitle}</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Location & Test Score */}
-                        <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1.5 border-t border-slate-100">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3 text-slate-400" /> {app.candidateLocation}
-                          </span>
-                          {app.assessmentResult && (
-                            <span className="font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-                              Score: {app.assessmentResult.score}%
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Quick Quick Stage Shift dropdown */}
-                        <div className="pt-2 flex items-center justify-between gap-1">
-                          <button
-                            onClick={() => setInspectApp(app)}
-                            className="text-[10px] font-semibold text-slate-600 hover:text-indigo-600 cursor-pointer"
-                          >
-                            View Details
-                          </button>
-
-                          <button
-                            onClick={() => setScheduleModalApp(app)}
-                            className="text-[10px] font-bold text-indigo-600 hover:bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 transition cursor-pointer"
-                          >
-                            Schedule Interview
-                          </button>
-                        </div>
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+        {loading ? (
+          <div className="py-10 text-center text-xs text-slate-400">Loading applications...</div>
+        ) : filteredApps.length === 0 ? (
+          <div className="py-10 text-center text-xs text-slate-500 border border-dashed border-slate-200 rounded-xl">
+            No applications matched your current filters.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[10px]">
+                  <th className="p-3">Candidate</th>
+                  <th className="p-3">Job</th>
+                  <th className="p-3">Applied</th>
+                  <th className="p-3">Documents</th>
+                  <th className="p-3">Stage</th>
+                  <th className="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {filteredApps.map((app) => (
+                  <tr key={app.id} className="hover:bg-slate-50/80 transition">
+                    <td className="p-3">
+                      <div className="font-bold text-slate-900">{app.candidateName}</div>
+                      <div className="text-[10px] text-slate-500">{app.candidateEmail}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">REF: {app.id}</div>
+                    </td>
+                    <td className="p-3 text-slate-700">{app.jobTitle}</td>
+                    <td className="p-3 text-slate-600">{new Date(app.appliedAt).toLocaleString()}</td>
+                    <td className="p-3 text-slate-700">{app.documents.length}</td>
+                    <td className="p-3">
+                      <div className="space-y-1.5">
+                        <StatusBadge stage={app.stage} />
+                        <select
+                          value={app.stage}
+                          onChange={(e) => handleStageChange(app.id, e.target.value as ApplicationStage)}
+                          className="w-full max-w-[180px] px-2 py-1 bg-white border border-slate-300 rounded-lg text-[11px] font-semibold text-slate-800"
+                        >
+                          {STAGES.map((stage) => (
+                            <option key={stage} value={stage}>
+                              Move to: {stage}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                    );
-                  })}
+                    </td>
+                    <td className="p-3 text-right">
+                      <button
+                        onClick={() => setSelectedApp(app)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] rounded-lg transition cursor-pointer"
+                      >
+                        <span>View Application</span>
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-                  {stageApps.length === 0 && (
-                    <div className="p-4 text-center text-[11px] text-slate-400 border border-dashed border-slate-200 rounded-xl">
-                      No candidates in {stage}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Candidate Profile Drawer Modal */}
-      {inspectApp && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50">
-          <div className="bg-white w-full max-w-xl h-full shadow-2xl p-6 overflow-y-auto space-y-6 relative border-l border-slate-200">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+      {selectedApp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
               <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  REF: {inspectApp.id}
-                </span>
-                <h3 className="font-extrabold text-slate-900 text-lg">{inspectApp.candidateName}</h3>
-                <p className="text-xs text-slate-500">{inspectApp.jobTitle}</p>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">REF: {selectedApp.id}</span>
+                <h3 className="font-extrabold text-slate-900 text-lg">{selectedApp.candidateName}</h3>
+                <p className="text-xs text-slate-500">{selectedApp.jobTitle}</p>
               </div>
-              <button onClick={() => setInspectApp(null)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg">
+              <button
+                onClick={() => setSelectedApp(null)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Quick Stage Update */}
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
-              <span className="text-xs font-bold text-slate-700 block">Current Stage</span>
-              <div className="flex items-center justify-between gap-2">
-                <StatusBadge stage={inspectApp.stage} />
-                <select
-                  value={inspectApp.stage}
-                  onChange={(e) => handleStageChangeSingle(inspectApp.id, e.target.value as ApplicationStage)}
-                  className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800"
-                >
-                  {KANBAN_STAGES.map((stg) => (
-                    <option key={stg} value={stg}>
-                      Move to: {stg}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Test Assessment Score Breakdown */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
-              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                <Award className="h-4 w-4 text-emerald-600" /> Automated Assessment Evaluation
-              </h4>
-              {inspectApp.assessmentResult ? (
-                <div className="grid grid-cols-3 gap-2 text-center text-xs pt-1">
-                  <div className="bg-slate-50 p-2 rounded">
-                    <span className="text-[10px] text-slate-400 block">Score</span>
-                    <span className="font-bold text-emerald-600 text-sm">{inspectApp.assessmentResult.score}%</span>
-                  </div>
-                  <div className="bg-slate-50 p-2 rounded">
-                    <span className="text-[10px] text-slate-400 block">Correct</span>
-                    <span className="font-bold text-slate-800 text-sm">
-                      {inspectApp.assessmentResult.correctAnswers} / {inspectApp.assessmentResult.totalQuestions}
-                    </span>
-                  </div>
-                  <div className="bg-slate-50 p-2 rounded">
-                    <span className="text-[10px] text-slate-400 block">Status</span>
-                    <span className="font-bold text-emerald-700 text-xs">
-                      {inspectApp.assessmentResult.passed ? 'PASSED' : 'FAILED'}
-                    </span>
-                  </div>
+            <div className="px-6 py-5 overflow-y-auto max-h-[calc(90vh-78px)] space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 text-xs space-y-2">
+                  <h4 className="font-bold text-slate-900 uppercase tracking-wider">Candidate Profile</h4>
+                  <p className="text-slate-700"><strong>Email:</strong> {selectedApp.candidateEmail}</p>
+                  <p className="text-slate-700"><strong>Phone:</strong> {selectedApp.candidatePhone}</p>
+                  <p className="text-slate-700"><strong>Location:</strong> {selectedApp.candidateLocation || 'Not specified'}</p>
+                  <p className="text-slate-700"><strong>Experience:</strong> {selectedApp.experienceYears || 'Not specified'}</p>
+                  {selectedApp.linkedinUrl && (
+                    <p className="text-slate-700 break-all"><strong>LinkedIn:</strong> {selectedApp.linkedinUrl}</p>
+                  )}
+                  {selectedApp.portfolioUrl && (
+                    <p className="text-slate-700 break-all"><strong>Portfolio:</strong> {selectedApp.portfolioUrl}</p>
+                  )}
                 </div>
-              ) : (
-                <p className="text-xs text-slate-500 italic">No test evaluation record available.</p>
-              )}
-            </div>
 
-            {/* Uploaded Documents */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                <Lock className="h-4 w-4 text-indigo-600" /> Encrypted Submitted Credentials ({inspectApp.documents.length})
-              </h4>
-              <div className="space-y-2">
-                {inspectApp.documents.map((doc) => (
-                  <div key={doc.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-slate-900 block">{doc.fileName}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        Type: {doc.fileType.toUpperCase()} | Size: {doc.fileSize}
-                      </span>
-                    </div>
-                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded">
-                      VERIFIED
-                    </span>
-                  </div>
-                ))}
+                <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 text-xs space-y-2">
+                  <h4 className="font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Award className="h-4 w-4 text-emerald-600" /> Assessment Result
+                  </h4>
+                  {selectedApp.assessmentResult ? (
+                    <>
+                      <p className="text-slate-700"><strong>Score:</strong> {selectedApp.assessmentResult.score}%</p>
+                      <p className="text-slate-700">
+                        <strong>Correct:</strong> {selectedApp.assessmentResult.correctAnswers} / {selectedApp.assessmentResult.totalQuestions}
+                      </p>
+                      <p className="text-slate-700">
+                        <strong>Status:</strong> {selectedApp.assessmentResult.passed ? 'Passed' : 'Failed'}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-slate-500 italic">No assessment result has been submitted yet.</p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Candidate Details */}
-            <div className="text-xs space-y-2 text-slate-700">
-              <p>
-                <strong>Email:</strong> {inspectApp.candidateEmail}
-              </p>
-              <p>
-                <strong>Phone:</strong> {inspectApp.candidatePhone}
-              </p>
-              <p>
-                <strong>Location:</strong> {inspectApp.candidateLocation}
-              </p>
-              <p>
-                <strong>Experience:</strong> {inspectApp.experienceYears || 'Not specified'}
-              </p>
-            </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <ClipboardCheck className="h-4 w-4 text-indigo-600" /> Compliance Answers
+                </h4>
+                {selectedApp.complianceAnswers ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {Object.entries(selectedApp.complianceAnswers).map(([key, value]) => (
+                      <div key={key} className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                        <span className="font-semibold text-slate-700 block">{COMPLIANCE_LABELS[key] || key}</span>
+                        <span className={`font-bold ${value === 'yes' ? 'text-emerald-700' : 'text-slate-600'}`}>
+                          {value.toUpperCase()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 italic">No compliance answers were attached to this application.</p>
+                )}
+              </div>
 
-            {/* Action Buttons */}
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-              <button
-                onClick={() => {
-                  setScheduleModalApp(inspectApp);
-                  setInspectApp(null);
-                }}
-                className="w-full py-2.5 bg-indigo-600 text-white font-bold text-xs rounded-xl hover:bg-indigo-700 transition"
-              >
-                Schedule Technical Interview
-              </button>
+              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <UserRound className="h-4 w-4 text-sky-600" /> Submitted Assessment Answers
+                </h4>
+                {selectedApp.assessmentResult?.answers && Object.keys(selectedApp.assessmentResult.answers).length > 0 ? (
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {Object.entries(selectedApp.assessmentResult.answers).map(([questionId, selectedIndex]) => (
+                      <div key={questionId} className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                        <div className="font-semibold text-slate-700">Question ID: {questionId}</div>
+                        <div className="text-slate-600">Selected Option Index: {Number(selectedIndex) + 1}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 italic">No assessment answer payload is available for this application.</p>
+                )}
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText className="h-4 w-4 text-indigo-600" /> Uploaded Documents ({selectedApp.documents.length})
+                </h4>
+                {selectedApp.documents.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic">No uploaded documents found.</p>
+                ) : (
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {selectedApp.documents.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-900 truncate">{doc.fileName}</div>
+                          <div className="text-[10px] text-slate-500 uppercase">{doc.fileType.replace('_', ' ')} • {doc.fileSize}</div>
+                          <div className="text-[10px] text-slate-400 break-all">{doc.downloadUrl || 'No URL saved'}</div>
+                        </div>
+
+                        {doc.downloadUrl ? (
+                          <a
+                            href={doc.downloadUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            Open
+                          </a>
+                        ) : (
+                          <span className="shrink-0 text-[10px] font-bold text-rose-600">URL Missing</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setScheduleModalApp(selectedApp)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg"
+                >
+                  <Calendar className="h-3.5 w-3.5" />
+                  Schedule Interview
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Bulk Action Modal */}
-      <BulkActionModal
-        isOpen={isBulkModalOpen}
-        onClose={() => setIsBulkModalOpen(false)}
-        selectedApplications={applications.filter((a) => selectedAppIds.includes(a.id))}
-        onApplyBulkUpdate={handleApplyBulkStage}
-      />
-
-      {/* Schedule Interview Modal */}
       <ScheduleInterviewModal
         isOpen={!!scheduleModalApp}
         onClose={() => setScheduleModalApp(null)}

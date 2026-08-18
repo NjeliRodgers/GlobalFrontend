@@ -162,7 +162,15 @@ export const AppShell: React.FC = () => {
 
           {activeTab === 'recruiter_dashboard' && (
             <RecruiterDashboardPage
-              onNavigateToPipeline={(jobId) => setActiveTab('pipeline')}
+              onNavigateToPipeline={async (jobId) => {
+                if (jobId) {
+                  const job = await fetchJobById(jobId);
+                  if (job) {
+                    setSelectedJob(job);
+                  }
+                }
+                setActiveTab('pipeline');
+              }}
               onNavigateToScheduler={() => setActiveTab('interviews')}
             />
           )}

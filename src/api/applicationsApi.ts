@@ -24,6 +24,21 @@ export async function submitApplication(appData: any): Promise<{ application: Ap
   return data;
 }
 
+export async function uploadApplicationDocument(file: File, fileType: string) {
+  const formData = new FormData();
+  formData.append('document', file);
+  formData.append('fileType', fileType);
+
+  const res = await apiFetch('/applications/documents/upload', {
+    method: 'POST',
+    body: formData
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to upload document');
+  return data.document;
+}
+
 export async function updateApplicationStage(id: string, stage: ApplicationStage, notes?: string): Promise<{ application: Application; emailLog: any }> {
   const res = await apiFetch(`/applications/${id}/stage`, {
     method: 'PATCH',
