@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { fetchCandidatesDirectory, CandidateDirectoryRow } from '../api/usersApi';
-import { Search, Users, ChevronDown, ChevronUp, ShieldCheck, FolderOpen } from 'lucide-react';
+import { Search, Users, ChevronDown, ChevronUp, ShieldCheck, FolderOpen, BarChart3, Clock3 } from 'lucide-react';
 
 export const CandidatesDirectoryPage: React.FC = () => {
   const [rows, setRows] = useState<CandidateDirectoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [applicationsOnly, setApplicationsOnly] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -21,8 +22,9 @@ export const CandidatesDirectoryPage: React.FC = () => {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((row) => {
+    const baseRows = applicationsOnly ? rows.filter((row) => row.totalApplications > 0) : rows;
+    if (!q) return baseRows;
+    return baseRows.filter((row) => {
       const inProfile =
         row.name.toLowerCase().includes(q) ||
         row.email.toLowerCase().includes(q) ||
@@ -33,7 +35,26 @@ export const CandidatesDirectoryPage: React.FC = () => {
       );
       return inProfile || inApplications;
     });
-  }, [rows, search]);
+  }, [rows, search, applicationsOnly]);
+
+  const analytics = useMemo(() => {
+    const totalCandidates = filtered.length;
+    const withApplications = filtered.filter((row) => row.totalApplications > 0).length;
+    const withAtesta = filtered.filter((row) => row.hasAtestaAccount).length;
+    const atestaActive = filtered.filter((row) => row.atestaAccountActive).length;
+
+    const totalApplications = filtered.reduce((sum, row) => sum + row.totalApplications, 0);
+    const atestaCoverage = totalCandidates > 0 ? Math.round((withAtesta / totalCandidates) * 100) : 0;
+
+    return {
+      totalCandidates,
+      withApplications,
+      withAtesta,
+      atestaActive,
+      totalApplications,
+      atestaCoverage
+    };
+  }, [filtered]);
 
   return (
     <div className="space-y-6">
@@ -58,6 +79,54 @@ export const CandidatesDirectoryPage: React.FC = () => {
             className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
+        <div className="pt-3 flex items-center gap-2">
+          <button
+            onClick={() => setApplicationsOnly((v) => !v)}
+            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition ${
+              applicationsOnly
+                ? 'bg-indigo-600 text-white border-indigo-600'
+                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            {applicationsOnly ? 'Showing: Applied Only' : 'Filter: Applied Only'}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-slate-500">Candidates</span>
+            <Users className="h-4 w-4 text-indigo-600" />
+          </div>
+          <div className="text-2xl font-black text-slate-900 mt-1">{analytics.totalCandidates}</div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-slate-500">Applied Candidates</span>
+            <BarChart3 className="h-4 w-4 text-blue-600" />
+          </div>
+          <div className="text-2xl font-black text-blue-700 mt-1">{analytics.withApplications}</div>
+          <p className="text-[10px] text-slate-500 mt-0.5">Total applications: {analytics.totalApplications}</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-slate-500">Atesta Created</span>
+            <ShieldCheck className="h-4 w-4 text-emerald-600" />
+          </div>
+          <div className="text-2xl font-black text-emerald-700 mt-1">{analytics.withAtesta}</div>
+          <p className="text-[10px] text-slate-500 mt-0.5">Active Atesta: {analytics.atestaActive}</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-slate-500">Atesta Coverage</span>
+            <Clock3 className="h-4 w-4 text-amber-600" />
+          </div>
+          <div className="text-2xl font-black text-amber-700 mt-1">{analytics.atestaCoverage}%</div>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
@@ -79,6 +148,7 @@ export const CandidatesDirectoryPage: React.FC = () => {
                   <th className="p-3">Candidate</th>
                   <th className="p-3">Platform Account</th>
                   <th className="p-3">Atesta Account</th>
+                  <th className="p-3">Atesta Created</th>
                   <th className="p-3">Applications</th>
                   <th className="p-3">Last Applied</th>
                   <th className="p-3 text-right">Details</th>
@@ -114,6 +184,9 @@ export const CandidatesDirectoryPage: React.FC = () => {
                             {row.hasAtestaAccount ? (row.atestaAccountActive ? 'Created (Active)' : 'Created (Inactive)') : 'Not Created'}
                           </span>
                         </td>
+                        <td className="p-3 text-slate-600 text-[11px]">
+                          {row.atestaRegisteredAt ? new Date(row.atestaRegisteredAt).toLocaleString() : 'N/A'}
+                        </td>
                         <td className="p-3 font-bold text-slate-800">{row.totalApplications}</td>
                         <td className="p-3 text-slate-600">
                           {row.lastAppliedAt ? new Date(row.lastAppliedAt).toLocaleString() : 'Never applied'}
@@ -131,7 +204,7 @@ export const CandidatesDirectoryPage: React.FC = () => {
 
                       {isOpen && (
                         <tr>
-                          <td colSpan={6} className="p-3 bg-slate-50/70">
+                          <td colSpan={7} className="p-3 bg-slate-50/70">
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                               <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
                                 <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
