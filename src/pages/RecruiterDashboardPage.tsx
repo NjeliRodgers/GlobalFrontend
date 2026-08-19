@@ -67,8 +67,6 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
         workType: newWorkType as any,
         salaryRange: newSalary,
         description: newDescription || 'Join our high-performing team to build scalable enterprise solutions.',
-        responsibilities: ['Architect scalable software services.', 'Collaborate with cross-functional partners.'],
-        requirements: ['Proven experience in domain engineering.', 'Strong communication and analytical skills.'],
         benefits: ['Health, Dental, Vision', 'Competitive salary & bonus'],
         status: 'active',
         apexExamId: newApexExamId.trim()
@@ -332,6 +330,10 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
                   onChange={setNewDescription}
                   placeholder="Describe the role — use the toolbar for bold, italic, or lists…"
                 />
+                <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                  <Sparkles className="h-3 w-3 text-indigo-400 shrink-0" />
+                  Key Responsibilities and Requirements & Qualifications.
+                </p>
               </div>
 
               {newJobError && (
