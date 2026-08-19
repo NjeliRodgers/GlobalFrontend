@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SubmittedDocument } from '../types';
 import { fetchDocuments } from '../api/documentsApi';
-import { ShieldCheck, Lock, FileText, Search, CheckCircle2, KeyRound } from 'lucide-react';
+import { ShieldCheck, Lock, FileText, Search, CheckCircle2, KeyRound, ExternalLink } from 'lucide-react';
 
 export const DocumentVaultPage: React.FC = () => {
   const [documents, setDocuments] = useState<SubmittedDocument[]>([]);
@@ -79,6 +79,7 @@ export const DocumentVaultPage: React.FC = () => {
                   <th className="p-3">File Name & Reference</th>
                   <th className="p-3">Document Category</th>
                   <th className="p-3">Size & Timestamp</th>
+                  <th className="p-3">Public Link</th>
                   <th className="p-3">Encrypted Cryptographic Checksum</th>
                   <th className="p-3 text-right">Verification Status</th>
                 </tr>
@@ -103,6 +104,20 @@ export const DocumentVaultPage: React.FC = () => {
                     <td className="p-3 text-slate-600">
                       <div>{doc.fileSize}</div>
                       <span className="text-[10px] text-slate-400">{new Date(doc.uploadedAt).toLocaleDateString()}</span>
+                    </td>
+                    <td className="p-3 text-[11px]">
+                      {doc.downloadUrl ? (
+                        <a
+                          href={doc.downloadUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-indigo-600 font-semibold hover:text-indigo-800"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" /> Open
+                        </a>
+                      ) : (
+                        <span className="text-slate-400">No URL</span>
+                      )}
                     </td>
                     <td className="p-3 font-mono text-[10px] text-slate-500">
                       <span className="flex items-center gap-1">

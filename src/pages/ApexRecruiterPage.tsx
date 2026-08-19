@@ -307,7 +307,7 @@ export const ApexRecruiterPage: React.FC = () => {
   };
 
   const handleDeleteQuestion = async (id: string) => {
-    if (confirm('Delete this question from the Apex question bank?')) {
+    if (confirm('Delete this question from the Atesta question bank?')) {
       await deleteApexQuestion(id);
       loadData();
     }
@@ -357,7 +357,7 @@ export const ApexRecruiterPage: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-black text-white">Apex Recruiter & Admin Management</h1>
+              <h1 className="text-2xl font-black text-white">Atesta Recruiter & Admin Management</h1>
               <span className="text-[10px] font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                 System Control
               </span>

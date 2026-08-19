@@ -57,8 +57,8 @@ export const FundingDashboardPage: React.FC<FundingDashboardPageProps> = ({ onBa
         </h1>
 
         <p className="mt-4 max-w-2xl text-sm font-bold leading-7 text-black sm:text-[15px]">
-          Once you're approved for a role, eligible relocation costs are tracked here. Funds can only be accessed
-          after certification exams are passed and you're approved for a job.
+          Once funding is approved, eligible relocation costs will be available for disbursement in line with the
+          program guidelines.
         </p>
 
         <span className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/70 border border-slate-200 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
@@ -87,7 +87,7 @@ export const FundingDashboardPage: React.FC<FundingDashboardPageProps> = ({ onBa
             <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-blue-50 border border-blue-100 px-4 py-3">
               <Info className="h-4 w-4 text-[#1f4e79] mt-0.5 flex-shrink-0" />
               <p className="text-xs text-[#1f4e79] leading-5">
-                Funds can only be accessed after exams are passed and you're approved for a job.
+                Once funding is approved, eligible expenses may be requested in accordance with program policy.
               </p>
             </div>
           </div>

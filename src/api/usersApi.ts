@@ -96,6 +96,43 @@ export async function fetchUsers(): Promise<User[]> {
   }
 }
 
+
+export interface CandidateDirectoryRow {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  location: string;
+  isPlatformAccountActive: boolean;
+  registeredAt: string;
+  hasAtestaAccount: boolean;
+  atestaAccountId: string | null;
+  atestaAccountActive: boolean;
+  atestaRegisteredAt: string | null;
+  totalApplications: number;
+  lastAppliedAt: string | null;
+  statusSummary: Record<string, number>;
+  applications: Array<{
+    applicationId: string;
+    jobId: string;
+    jobTitle: string;
+    stage: string;
+    appliedAt: string;
+    lastUpdated: string;
+    documentsCount: number;
+  }>;
+}
+
+export async function fetchCandidatesDirectory(): Promise<CandidateDirectoryRow[]> {
+  try {
+    const res = await apiFetch('/users/candidates/directory');
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.candidates || [];
+  } catch (err) {
+    return [];
+  }
+}
 export async function updateUserProfile(userId: string, updates: {
   name?: string;
   phone?: string;
