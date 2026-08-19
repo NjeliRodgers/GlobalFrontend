@@ -2,7 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { fetchCandidatesDirectory, CandidateDirectoryRow } from '../api/usersApi';
 import { Search, Users, ChevronDown, ChevronUp, ShieldCheck, FolderOpen, BarChart3, Clock3 } from 'lucide-react';
 
-export const CandidatesDirectoryPage: React.FC = () => {
+interface CandidatesDirectoryPageProps {
+  initialJobId?: string;
+  initialJobTitle?: string;
+}
+
+export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = ({
+  initialJobId,
+  initialJobTitle
+}) => {
   const [rows, setRows] = useState<CandidateDirectoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -20,9 +28,31 @@ export const CandidatesDirectoryPage: React.FC = () => {
     setLoading(false);
   };
 
+  const scopedRows = useMemo(() => {
+    if (!initialJobId) return rows;
+
+    return rows
+      .map((row) => {
+        const scopedApplications = row.applications.filter((app) => app.jobId === initialJobId);
+        const statusSummary = scopedApplications.reduce<Record<string, number>>((acc, app) => {
+          acc[app.stage] = (acc[app.stage] || 0) + 1;
+          return acc;
+        }, {});
+
+        return {
+          ...row,
+          applications: scopedApplications,
+          totalApplications: scopedApplications.length,
+          lastAppliedAt: scopedApplications[0]?.appliedAt || null,
+          statusSummary
+        };
+      })
+      .filter((row) => row.totalApplications > 0);
+  }, [rows, initialJobId]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const baseRows = applicationsOnly ? rows.filter((row) => row.totalApplications > 0) : rows;
+    const baseRows = applicationsOnly ? scopedRows.filter((row) => row.totalApplications > 0) : scopedRows;
     if (!q) return baseRows;
     return baseRows.filter((row) => {
       const inProfile =
@@ -35,7 +65,7 @@ export const CandidatesDirectoryPage: React.FC = () => {
       );
       return inProfile || inApplications;
     });
-  }, [rows, search, applicationsOnly]);
+  }, [scopedRows, search, applicationsOnly]);
 
   const analytics = useMemo(() => {
     const totalCandidates = filtered.length;
@@ -62,10 +92,18 @@ export const CandidatesDirectoryPage: React.FC = () => {
         <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md uppercase tracking-wider mb-1 inline-block">
           Candidate Intelligence
         </span>
-        <h1 className="text-2xl font-extrabold text-slate-900">Candidates Directory</h1>
-        <p className="text-xs text-slate-500 mt-0.5">
-          View all registered candidates, application history, current statuses, and Atesta account readiness.
-        </p>
+        <h1 className="text-2xl font-extrabold text-slate-900">
+          {initialJobId ? 'Job Applicants Directory' : 'Candidates Directory'}
+        </h1>
+        {initialJobId ? (
+          <p className="text-xs text-slate-500 mt-0.5">
+            Showing only candidates who applied for {initialJobTitle || 'the selected role'} (Job Ref: {initialJobId}).
+          </p>
+        ) : (
+          <p className="text-xs text-slate-500 mt-0.5">
+            View all registered candidates, application history, current statuses, and Atesta account readiness.
+          </p>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs max-w-xl">
