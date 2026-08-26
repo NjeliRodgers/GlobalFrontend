@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Job, Application } from '../types';
-import { fetchJobs, createJob } from '../api/jobsApi';
+import { fetchJobs, createJob, updateJob } from '../api/jobsApi';
 import { fetchApplications } from '../api/applicationsApi';
 import { getApexPackages } from '../api/apexAssessmentApi';
 import { RichTextEditor } from '../components/RichTextEditor';
@@ -16,7 +16,8 @@ import {
   DollarSign,
   Filter,
   Layers,
-  Sparkles
+  Sparkles,
+  Pencil
 } from 'lucide-react';
 
 interface RecruiterDashboardPageProps {
@@ -36,13 +37,15 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
   // New Job Modal State
   const [isNewJobModalOpen, setIsNewJobModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
-  const [newDepartment, setNewDepartment] = useState('  ');
-  const [newLocation, setNewLocation] = useState(' ');
-  const [newWorkType, setNewWorkType] = useState(' ');
-  const [newSalary, setNewSalary] = useState('ksh.130,000 - KSh.170,000 / month');
+  const [newDepartment, setNewDepartment] = useState('');
+  const [newLocation, setNewLocation] = useState('');
+  const [newWorkType, setNewWorkType] = useState('Full-Time');
+  const [newSalary, setNewSalary] = useState('');
   const [newDescription, setNewDescription] = useState('');
-  const [newApexPackageId, setNewApexPackageId] = useState('');
+  const [newApexPackageIds, setNewApexPackageIds] = useState<string[]>([]);
+  const [packagePickerValue, setPackagePickerValue] = useState('');
   const [newJobError, setNewJobError] = useState('');
+  const [editingJobId, setEditingJobId] = useState<string | null>(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -50,48 +53,82 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
 
   const loadDashboardData = async () => {
     setLoading(true);
-    const [jobsData, appsData, packagesData] = await Promise.all([fetchJobs(), fetchApplications(), getApexPackages()]);
+    const [jobsData, appsData, packagesData] = await Promise.all([fetchJobs(), fetchApplications(), getApexPackages().catch((err) => { console.error('Failed to load packages:', err); return []; })]);
     setJobs(jobsData);
     setApplications(appsData);
     setPackages((packagesData || []).filter((p) => p.isActive));
     setLoading(false);
   };
 
+  const handleOpenEditJob = (job: Job) => {
+    setEditingJobId(job.id);
+    setNewTitle(job.title);
+    setNewDepartment(job.department);
+    setNewLocation(job.location);
+    setNewWorkType(job.workType);
+    setNewSalary(job.salaryRange);
+    setNewDescription(job.description);
+    setNewApexPackageIds(
+      job.apexPackageIds && job.apexPackageIds.length ? job.apexPackageIds : job.apexPackageId ? [job.apexPackageId] : []
+    );
+    setNewJobError('');
+    setIsNewJobModalOpen(true);
+  };
+
   const handleCreateJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle || !newDepartment) return;
-    if (!newApexPackageId) {
+    if (newApexPackageIds.length === 0) {
       setNewJobError('Please choose a package before publishing this job.');
       return;
     }
     setNewJobError('');
 
-    const selectedPackage = packages.find((p) => p.id === newApexPackageId || p.packageId === newApexPackageId);
-    if (!selectedPackage) {
+    const selectedPackages = newApexPackageIds
+      .map((ref) => packages.find((p) => p.id === ref || p.packageId === ref))
+      .filter((p): p is { id: string; packageId?: string; name: string; isActive: boolean } => Boolean(p));
+    if (selectedPackages.length !== newApexPackageIds.length) {
       setNewJobError('Selected package could not be found. Refresh and try again.');
       return;
     }
 
+    const jobPayload: any = {
+      title: newTitle,
+      department: newDepartment,
+      location: newLocation,
+      workType: newWorkType as any,
+      salaryRange: newSalary,
+      description: newDescription || 'Join our high-performing team to build scalable enterprise solutions.',
+      apexPackageIds: selectedPackages.map((p) => p.packageId || p.id)
+    };
+
+    // Only stamp default status/benefits on a brand-new posting — editing an
+    // existing job must never silently reactivate it or wipe its benefits.
+    if (!editingJobId) {
+      jobPayload.status = 'active';
+      jobPayload.benefits = ['Health, Dental, Vision', 'Competitive salary & bonus'];
+    }
+
     try {
-      await createJob({
-        title: newTitle,
-        department: newDepartment,
-        location: newLocation,
-        workType: newWorkType as any,
-        salaryRange: newSalary,
-        description: newDescription || 'Join our high-performing team to build scalable enterprise solutions.',
-        benefits: ['Health, Dental, Vision', 'Competitive salary & bonus'],
-        status: 'active',
-        apexPackageId: selectedPackage.packageId || selectedPackage.id
-      });
+      if (editingJobId) {
+        await updateJob(editingJobId, jobPayload);
+      } else {
+        await createJob(jobPayload);
+      }
 
       setIsNewJobModalOpen(false);
+      setEditingJobId(null);
       setNewTitle('');
       setNewDescription('');
-      setNewApexPackageId('');
+      setNewApexPackageIds([]);
       loadDashboardData();
     } catch (err: any) {
-      setNewJobError(err.message || 'Failed to post job. Check the selected package and try again.');
+      setNewJobError(
+        err.message ||
+          (editingJobId
+            ? 'Failed to update job. Check the selected package and try again.'
+            : 'Failed to post job. Check the selected package and try again.')
+      );
     }
   };
 
@@ -118,7 +155,18 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
         </div>
 
         <button
-          onClick={() => setIsNewJobModalOpen(true)}
+          onClick={() => {
+            setEditingJobId(null);
+            setNewTitle('');
+            setNewDepartment('  ');
+            setNewLocation(' ');
+            setNewWorkType(' ');
+            setNewSalary('ksh.130,000 - KSh.170,000 / month');
+            setNewDescription('');
+            setNewApexPackageIds([]);
+            setNewJobError('');
+            setIsNewJobModalOpen(true);
+          }}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
         >
           <Plus className="h-4 w-4" />
@@ -230,12 +278,21 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
                       </span>
                     </td>
                     <td className="p-3 text-right">
-                      <button
-                        onClick={() => onNavigateToPipeline(job.id)}
-                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] rounded-lg transition cursor-pointer shadow-2xs"
-                      >
-                        Manage Applicants
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleOpenEditJob(job)}
+                          className="px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-300 hover:text-indigo-700 text-slate-600 font-bold text-[11px] rounded-lg transition cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Pencil className="h-3 w-3" />
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => onNavigateToPipeline(job.id)}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] rounded-lg transition cursor-pointer shadow-2xs"
+                        >
+                          Manage Applicants
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -250,8 +307,14 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto my-8">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <h3 className="font-bold text-slate-900 text-lg">Post New Job Opening</h3>
-              <button onClick={() => setIsNewJobModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-600">
+              <h3 className="font-bold text-slate-900 text-lg">{editingJobId ? 'Edit Job Opening' : 'Post New Job Opening'}</h3>
+              <button
+                onClick={() => {
+                  setIsNewJobModalOpen(false);
+                  setEditingJobId(null);
+                }}
+                className="p-1.5 text-slate-400 hover:text-slate-600"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -321,22 +384,53 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Assessment Package</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Assessment Packages</label>
                 <select
-                  value={newApexPackageId}
-                  onChange={(e) => setNewApexPackageId(e.target.value)}
-                  required
+                  value={packagePickerValue}
+                  onChange={(e) => {
+                    const ref = e.target.value;
+                    if (ref && !newApexPackageIds.includes(ref)) {
+                      setNewApexPackageIds((current) => [...current, ref]);
+                    }
+                    setPackagePickerValue('');
+                  }}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  <option value="">Select a package</option>
-                  {packages.map((pkg) => (
-                    <option key={pkg.id} value={pkg.packageId || pkg.id}>
-                      {pkg.packageId ? `${pkg.packageId} - ` : ''}{pkg.name}
-                    </option>
-                  ))}
+                  <option value="">Add a package…</option>
+                  {packages
+                    .filter((pkg) => !newApexPackageIds.includes(pkg.packageId || pkg.id))
+                    .map((pkg) => (
+                      <option key={pkg.id} value={pkg.packageId || pkg.id}>
+                        {pkg.packageId ? `${pkg.packageId} - ` : ''}{pkg.name}
+                      </option>
+                    ))}
                 </select>
+
+                {newApexPackageIds.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {newApexPackageIds.map((ref) => {
+                      const pkg = packages.find((p) => p.id === ref || p.packageId === ref);
+                      return (
+                        <span
+                          key={ref}
+                          className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 text-[11px] font-semibold px-2.5 py-1 rounded-full"
+                        >
+                          {pkg?.packageId ? `${pkg.packageId} - ` : ''}{pkg?.name || ref}
+                          <button
+                            type="button"
+                            onClick={() => setNewApexPackageIds((current) => current.filter((id) => id !== ref))}
+                            className="hover:text-indigo-900"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Choose an active package. The selected Package ID is used automatically to map assessment flow.
+                  Add one or more active packages.
                 </p>
               </div>
 
@@ -362,7 +456,10 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
               <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsNewJobModalOpen(false)}
+                  onClick={() => {
+                    setIsNewJobModalOpen(false);
+                    setEditingJobId(null);
+                  }}
                   className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
                 >
                   Cancel
@@ -371,7 +468,7 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
                   type="submit"
                   className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-xs cursor-pointer"
                 >
-                  Publish Job Opening
+                  {editingJobId ? 'Save Changes' : 'Publish Job Opening'}
                 </button>
               </div>
             </form>

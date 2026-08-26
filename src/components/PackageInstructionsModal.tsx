@@ -16,7 +16,10 @@ export default function PackageInstructionsModal({ pkg, onClose, onSave }: Props
     howToCompleteSteps: pkg.instructions?.howToCompleteSteps?.length
       ? pkg.instructions.howToCompleteSteps
       : [],
-    confidentialityNote: pkg.instructions?.confidentialityNote || ''
+    confidentialityNote: pkg.instructions?.confidentialityNote || '',
+    examIntro: pkg.instructions?.examIntro || '',
+    courseIntro: pkg.instructions?.courseIntro || '',
+    interviewIntro: pkg.instructions?.interviewIntro || ''
   });
   const [stepsText, setStepsText] = useState(
     (pkg.instructions?.howToCompleteSteps || []).join('\n')
@@ -90,6 +93,39 @@ export default function PackageInstructionsModal({ pkg, onClose, onSave }: Props
             value={form.confidentialityNote}
             onChange={(e) => setForm({ ...form, confidentialityNote: e.target.value })}
             rows={3}
+            className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-slate-300 mb-1">Exam page intro (shown on the Exams module page)</label>
+          <textarea
+            value={form.examIntro}
+            onChange={(e) => setForm({ ...form, examIntro: e.target.value })}
+            rows={3}
+            placeholder="Default: generic exam instructions"
+            className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-slate-300 mb-1">Course page intro (shown on the Course module page)</label>
+          <textarea
+            value={form.courseIntro}
+            onChange={(e) => setForm({ ...form, courseIntro: e.target.value })}
+            rows={3}
+            placeholder="Default: generic course instructions"
+            className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-slate-300 mb-1">AI Interview page intro (shown on the Interview module page)</label>
+          <textarea
+            value={form.interviewIntro}
+            onChange={(e) => setForm({ ...form, interviewIntro: e.target.value })}
+            rows={3}
+            placeholder="Default: generic interview instructions"
             className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
           />
         </div>

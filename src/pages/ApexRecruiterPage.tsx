@@ -1120,8 +1120,10 @@ export const ApexRecruiterPage: React.FC = () => {
                   packageId: suggestPackageId(packages),
                   description: '',
                   category: '',
-                  examId: exams[0]?.id || '',
-                  courseId: courses[0]?.id || '',
+                  examIds: [] as string[],
+                  courseIds: [] as string[],
+                  interviewCostKsh: 0,
+                  interviewPassMarkPercent: 70,
                   costKsh: 0,
                   certificateRule: 'AND',
                   isActive: true
@@ -1192,54 +1194,76 @@ export const ApexRecruiterPage: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Exam</label>
-                  <select
-                    value={editingPackage.examId}
-                    onChange={(e) => setEditingPackage({ ...editingPackage, examId: e.target.value })}
-                    required
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
-                  >
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Exams (select all that apply)</label>
+                  <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1 bg-slate-50">
                     {exams.map((ex) => (
-                      <option key={ex.id} value={ex.id}>{ex.name}</option>
+                      <label key={ex.id} className="flex items-center gap-2 text-xs text-slate-700 px-1 py-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={(editingPackage.examIds || []).includes(ex.id)}
+                          onChange={(e) => {
+                            const current = editingPackage.examIds || [];
+                            const next = e.target.checked ? [...current, ex.id] : current.filter((id) => id !== ex.id);
+                            setEditingPackage({ ...editingPackage, examIds: next });
+                          }}
+                        />
+                        {ex.name} — KSh {ex.costKsh.toLocaleString()}
+                      </label>
                     ))}
-                  </select>
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Course</label>
-                  <select
-                    value={editingPackage.courseId}
-                    onChange={(e) => setEditingPackage({ ...editingPackage, courseId: e.target.value })}
-                    required
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
-                  >
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Courses (select all that apply)</label>
+                  <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1 bg-slate-50">
                     {courses.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                      <label key={c.id} className="flex items-center gap-2 text-xs text-slate-700 px-1 py-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={(editingPackage.courseIds || []).includes(c.id)}
+                          onChange={(e) => {
+                            const current = editingPackage.courseIds || [];
+                            const next = e.target.checked ? [...current, c.id] : current.filter((id) => id !== c.id);
+                            setEditingPackage({ ...editingPackage, courseIds: next });
+                          }}
+                        />
+                        {c.name}
+                      </label>
                     ))}
-                  </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">AI Interview Cost (KSh)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editingPackage.interviewCostKsh ?? 0}
+                      onChange={(e) => setEditingPackage({ ...editingPackage, interviewCostKsh: Number(e.target.value) })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">AI Interview Pass Mark (%)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={editingPackage.interviewPassMarkPercent ?? 70}
+                      onChange={(e) => setEditingPackage({ ...editingPackage, interviewPassMarkPercent: Number(e.target.value) })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Category</label>
-                  <input
-                    type="text"
-                    value={editingPackage.category || ''}
-                    onChange={(e) => setEditingPackage({ ...editingPackage, category: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Combined Package Cost (KSh)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={editingPackage.costKsh || ''}
-                    onChange={(e) => setEditingPackage({ ...editingPackage, costKsh: Number(e.target.value) })}
-                    required
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Category</label>
+                <input
+                  type="text"
+                  value={editingPackage.category || ''}
+                  onChange={(e) => setEditingPackage({ ...editingPackage, category: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
+                />
               </div>
 
               <div>
@@ -1297,8 +1321,8 @@ export const ApexRecruiterPage: React.FC = () => {
           <div className="space-y-3">
             {packages.length === 0 && <p className="text-center py-8 text-slate-400 text-xs">No packages created yet.</p>}
             {packages.map((p) => {
-              const exam = exams.find((ex) => ex.id === p.examId);
-              const course = courses.find((c) => c.id === p.courseId);
+              const pExamIds: string[] = Array.isArray(p.examIds) && p.examIds.length > 0 ? p.examIds : p.examId ? [p.examId] : [];
+              const pCourseIds: string[] = Array.isArray(p.courseIds) && p.courseIds.length > 0 ? p.courseIds : p.courseId ? [p.courseId] : [];
               return (
                 <div
                   key={p.id}
@@ -1315,7 +1339,7 @@ export const ApexRecruiterPage: React.FC = () => {
                       {p.packageId && <span className="text-slate-900"> - {p.packageId}</span>}
                     </h4>
                     <p className="text-[11px] text-slate-600">
-                      {exam?.name || 'Unknown exam'} + {course?.name || 'Unknown course'} · <strong className="text-amber-700">KSh {p.costKsh.toLocaleString()}</strong>
+                      {pExamIds.length} exam{pExamIds.length === 1 ? '' : 's'} + {pCourseIds.length} course{pCourseIds.length === 1 ? '' : 's'}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 self-start sm:self-center">

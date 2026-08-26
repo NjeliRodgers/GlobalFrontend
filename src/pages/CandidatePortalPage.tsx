@@ -28,11 +28,13 @@ import {
 interface CandidatePortalPageProps {
   onSelectJobForApply?: (job: Job) => void;
   onSelectJobForDetails?: (job: Job) => void;
+  onViewReadiness?: (applicationId: string) => void;
 }
 
 export const CandidatePortalPage: React.FC<CandidatePortalPageProps> = ({
   onSelectJobForApply = () => {},
-  onSelectJobForDetails = () => {}
+  onSelectJobForDetails = () => {},
+  onViewReadiness = () => {}
 }) => {
   const { user, updateUser, uploadAvatar } = useAuth();
   const [applications, setApplications] = useState<Application[]>([]);
@@ -331,6 +333,17 @@ export const CandidatePortalPage: React.FC<CandidatePortalPageProps> = ({
                           <Lock className="h-3 w-3 text-emerald-600" /> {app.documents.length} Encrypted
                         </span>
                       </div>
+                    </div>
+
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => onViewReadiness(app.id)}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition cursor-pointer"
+                      >
+                        <Award className="h-3.5 w-3.5" />
+                        View Deployment Readiness
+                      </button>
                     </div>
                   </div>
                 ))}

@@ -51,6 +51,7 @@ export interface Job {
   assessmentId?: string;
   apexPackageId?: string;
   apexExamId?: string;
+  apexPackageIds?: string[];
   postedAt: string;
   deadline?: string;
 }
@@ -78,6 +79,42 @@ export interface SubmittedDocument {
   downloadUrl?: string;
 }
 
+
+export type ComplianceQuestionId =
+  | 'hasCovidCover'
+  | 'hasForeignExperience'
+  | 'hasPassport'
+  | 'hasApexCertificate'
+  | 'hasGoodConduct'
+  | 'willingToRelocate'
+  | 'hasLegalRestrictions';
+
+export interface ReadinessItem {
+  id: ComplianceQuestionId;
+  answer: 'yes' | 'no' | null;
+  complete: boolean;
+  status: 'complete' | 'missing' | 'not_available' | 'needs_upload';
+  documentType?: SubmittedDocument['fileType'];
+  message: string;
+}
+
+export interface ReadinessProgress {
+  percentage: number;
+  completed: number;
+  total: number;
+  items: ReadinessItem[];
+}
+
+export interface ApplicationVoucher {
+  id: string;
+  applicationId: string;
+  candidateId: string;
+  code: string;
+  packageIds: string[];
+  issuedAt: string;
+  redeemedByCandidateId?: string | null;
+  redeemedAt?: string | null;
+}
 export interface CandidateAssessmentResult {
   id: string;
   applicationId: string;
@@ -118,6 +155,10 @@ export interface Application {
   apexStage2Passed?: boolean;
   apexStage2AiScore?: number;
   apexInterviewExpiresAt?: string;
+
+  complianceAnswers?: Partial<Record<ComplianceQuestionId, 'yes' | 'no'>>;
+  readinessProgress?: ReadinessProgress;
+  readinessUpdatedAt?: string;
 }
 
 export type PaystackProvider = 'mpesa' | 'visa' | 'airtel_money';
@@ -185,6 +226,9 @@ export interface ApexPackageInstructions {
   whyCertificateMatters?: string;
   howToCompleteSteps?: string[];
   confidentialityNote?: string;
+  examIntro?: string;
+  courseIntro?: string;
+  interviewIntro?: string;
 }
 
 export interface ApexPackage {
@@ -193,9 +237,13 @@ export interface ApexPackage {
   packageId?: string;
   description?: string;
   category?: string;
-  examId: string;
-  courseId: string;
+  examId?: string;
+  courseId?: string;
+  examIds?: string[];
+  courseIds?: string[];
   costKsh: number;
+  interviewCostKsh?: number | null;
+  interviewPassMarkPercent?: number | null;
   certificateRule: 'AND' | 'OR';
   isActive: boolean;
   instructions?: ApexPackageInstructions | null;

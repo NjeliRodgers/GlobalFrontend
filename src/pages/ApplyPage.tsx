@@ -23,6 +23,7 @@ import {
 interface ApplyPageProps {
   job: Job;
   onBack: () => void;
+  onSubmitted: (applicationId: string) => void;
 }
 
 type ComplianceAnswer = 'yes' | 'no' | null;
@@ -96,7 +97,7 @@ const COMPLIANCE_QUESTIONS: ComplianceQuestion[] = [
   }
 ];
 
-export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack }) => {
+export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }) => {
   const { user } = useAuth();
 
   const [step, setStep] = useState<1 | 2>(1);
@@ -238,7 +239,7 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack }) => {
         uploadedDocuments.push(uploaded);
       }
 
-      await submitApplication({
+      const { application } = await submitApplication({
         jobId: job.id,
         jobTitle: job.title,
         candidateId: user?.id || `usr-${Date.now()}`,
@@ -256,10 +257,8 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack }) => {
 
       setSaving(false);
       setSubmitted(true);
-      // Give the candidate a clear confirmation, then send them back to the
-      // recommended-jobs board once the loader has run.
       setTimeout(() => {
-        onBack();
+        onSubmitted(application.id);
       }, 2600);
     } catch (err: any) {
       setError(err.message || 'Failed to save application');
@@ -308,7 +307,7 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack }) => {
           <h2 className="text-xl font-extrabold text-slate-900">Your application has been sent!</h2>
           <p className="text-sm text-slate-500 max-w-sm">
             We've received your application for <strong className="text-slate-700">{job.title}</strong> and emailed
-            you a confirmation. Taking you back to your job recommendations…
+            you a confirmation. Wait and see your application summary update…
           </p>
           <div className="h-8 w-8 border-2 border-slate-200 border-t-indigo-600 rounded-full animate-spin mt-2" />
         </div>

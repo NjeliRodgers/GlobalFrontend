@@ -19,9 +19,27 @@ import { EmailLogsPage } from './pages/EmailLogsPage';
 import { DocumentVaultPage } from './pages/DocumentVaultPage';
 import { TeamRbacPage } from './pages/TeamRbacPage';
 import { CandidatesDirectoryPage } from './pages/CandidatesDirectoryPage';
+import { ImportDetailPage } from './pages/ImportDetailPage';
 import { fetchJobById } from './api/jobsApi';
 import { ActivateAccount } from './auth/ActivateAccount';
 import { ResetPasswordForm } from './auth/ResetPasswordForm';
+
+const JOB_SCOPED_TABS = new Set(['job_detail', 'apply', 'pipeline']);
+const APPLICATION_SCOPED_TABS = new Set(['import_detail']);
+
+const parseHash = (): { tab: string; id?: string } => {
+  const raw = window.location.hash.replace(/^#\/?/, '');
+  if (!raw) return { tab: 'job_board' };
+  const [tab, id] = raw.split('/');
+  return { tab: tab || 'job_board', id: id || undefined };
+};
+
+const buildHash = (tab: string, id?: string): string => {
+  if ((JOB_SCOPED_TABS.has(tab) || APPLICATION_SCOPED_TABS.has(tab)) && id) {
+    return `#/${tab}/${id}`;
+  }
+  return `#/${tab}`;
+};
 
 export const AppShell: React.FC = () => {
   type UrlAuthAction =
@@ -32,8 +50,15 @@ export const AppShell: React.FC = () => {
 
   const { isAuthenticated, pendingJobId, clearPendingJobId } = useAuth();
 
-  const [activeTab, setActiveTab] = useState('job_board');
+  const initialHash = parseHash();
+  const [activeTab, setActiveTab] = useState(initialHash.tab || 'job_board');
+  const [resolvingHashJob, setResolvingHashJob] = useState(
+    Boolean(initialHash.id) && JOB_SCOPED_TABS.has(initialHash.tab)
+  );
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [readinessApplicationId, setReadinessApplicationId] = useState<string | undefined>(
+    APPLICATION_SCOPED_TABS.has(initialHash.tab) ? initialHash.id : undefined
+  );
 
   // Detect activation/reset-password links from emails, e.g.
   // http://localhost:5173/?activationToken=...&email=...
@@ -62,6 +87,31 @@ export const AppShell: React.FC = () => {
 
   // Active selections
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+
+  useEffect(() => {
+    if (!initialHash.id || !JOB_SCOPED_TABS.has(initialHash.tab)) return;
+    fetchJobById(initialHash.id).then((job) => {
+      if (job) {
+        setSelectedJob(job);
+      } else {
+        setActiveTab('job_board');
+      }
+      setResolvingHashJob(false);
+    });
+  }, []);
+
+  // Keep the address bar in sync with in-app navigation so refreshing (or
+  // sharing the link) restores the same tab/job/application instead of the
+  // home page.
+  useEffect(() => {
+    const id = APPLICATION_SCOPED_TABS.has(activeTab) ? readinessApplicationId : selectedJob?.id;
+    window.history.replaceState({}, '', buildHash(activeTab, id));
+  }, [activeTab, selectedJob?.id, readinessApplicationId]);
+
+  const handleApplicationSubmitted = (applicationId: string) => {
+    setReadinessApplicationId(applicationId);
+    setActiveTab('import_detail');
+  };
 
   // If user just authenticated and had a pending job apply
   useEffect(() => {
@@ -102,6 +152,14 @@ export const AppShell: React.FC = () => {
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md p-6">
           <ResetPasswordForm email={urlAuthAction.email} token={urlAuthAction.token} onSuccess={clearUrlAuthAction} />
         </div>
+      </div>
+    );
+  }
+
+  if (resolvingHashJob) {
+    return (
+      <div className="min-h-screen bg-slate-100/70 flex items-center justify-center">
+        <div className="h-8 w-8 border-2 border-slate-200 border-t-indigo-600 rounded-full animate-spin" />
       </div>
     );
   }
@@ -154,12 +212,27 @@ export const AppShell: React.FC = () => {
             <ApplyPage
               job={selectedJob}
               onBack={() => setActiveTab('job_board')}
+              onSubmitted={handleApplicationSubmitted}
+            />
+          )}
+
+          {activeTab === 'import_detail' && readinessApplicationId && (
+            <ImportDetailPage
+              applicationId={readinessApplicationId}
+              onBackToJobBoard={() => setActiveTab('job_board')}
             />
           )}
 
           {activeTab === 'apex_recruiter' && <ApexRecruiterPage />}
 
-          {activeTab === 'candidate_portal' && <CandidatePortalPage />}
+          {activeTab === 'candidate_portal' && (
+            <CandidatePortalPage
+              onViewReadiness={(applicationId) => {
+                setReadinessApplicationId(applicationId);
+                setActiveTab('import_detail');
+              }}
+            />
+          )}
 
           {activeTab === 'recruiter_dashboard' && (
             <RecruiterDashboardPage

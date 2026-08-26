@@ -1,4 +1,10 @@
-import { Application, ApplicationStage } from '../types';
+import {
+  Application,
+  ApplicationStage,
+  ApplicationVoucher,
+  ReadinessProgress,
+  SubmittedDocument
+} from '../types';
 import { apiFetch, jsonHeaders } from './client';
 
 export async function fetchApplications(params?: { jobId?: string; stage?: string; candidateId?: string }): Promise<Application[]> {
@@ -59,4 +65,74 @@ export async function bulkUpdateApplicationStages(applicationIds: string[], stag
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to bulk update stages');
   return data.applications;
+}
+
+export async function fetchApplicationReadiness(applicationId: string): Promise<{
+  application: Application;
+  readinessProgress: ReadinessProgress;
+  assignedPackageIds: string[];
+  voucher: ApplicationVoucher | null;
+}> {
+  const res = await apiFetch(`/applications/${applicationId}/readiness`);
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to load application readiness.');
+  }
+
+  return data;
+}
+
+export async function updateApplicationReadiness(
+  applicationId: string,
+  payload: {
+    complianceAnswers?: Partial<Application['complianceAnswers']>;
+    documents?: Application['documents'];
+  }
+): Promise<{
+  application: Application;
+  readinessProgress: ReadinessProgress;
+  assignedPackageIds: string[];
+  voucher: ApplicationVoucher | null;
+}> {
+  const res = await apiFetch(`/applications/${applicationId}/readiness`, {
+    method: 'PATCH',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to update application readiness.');
+  }
+
+  return data;
+}
+
+
+export async function uploadApplicationReadinessDocument(
+  applicationId: string,
+  file: File,
+  fileType: string
+): Promise<{
+  document: SubmittedDocument;
+  application: Application;
+  readinessProgress: ReadinessProgress;
+  assignedPackageIds: string[];
+  voucher: ApplicationVoucher | null;
+}> {
+  const formData = new FormData();
+  formData.append('document', file);
+  formData.append('fileType', fileType);
+
+  const res = await apiFetch(`/applications/${applicationId}/readiness/documents`, {
+    method: 'POST',
+    body: formData
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to upload document');
+  return data;
 }
