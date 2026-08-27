@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Job, SubmittedDocument } from '../types';
 import { useAuth } from '../auth/AuthContext';
 import { submitApplication, fetchApplications, uploadApplicationDocument } from '../api/applicationsApi';
+import { validateAtestaCertificate, AtestaValidationResult } from '../api/apexAssessmentApi';
 import { isValidEmail, isValidPhone, EMAIL_ERROR_MESSAGE, PHONE_ERROR_MESSAGE } from '../utils/validators';
 import {
   User,
@@ -125,6 +126,12 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
   const [coverLetterFile, setCoverLetterFile] = useState<File | null>(null);
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
 
+  // Atesta Certificate ID — pasted, checked against the Atesta database.
+  const [atestaCertificateId, setAtestaCertificateId] = useState('');
+  const [atestaSkipped, setAtestaSkipped] = useState(false);
+  const [atestaCheckStatus, setAtestaCheckStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
+  const [atestaCheckMessage, setAtestaCheckMessage] = useState('');
+
   // Phase 6: compliance question answers + their conditional uploads
   const [complianceAnswers, setComplianceAnswers] = useState<Record<string, ComplianceAnswer>>(
     Object.fromEntries(COMPLIANCE_QUESTIONS.map((q) => [q.id, null]))
@@ -202,11 +209,52 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
     return false;
   });
 
+  // The Atesta question only blocks submission when the candidate said
+  // "yes" and hasn't verified an ID and hasn't chosen "provide it later".
+  const atestaAnswer = complianceAnswers['hasApexCertificate'];
+  const atestaIdIncomplete = atestaAnswer === 'yes' && !atestaSkipped && atestaCheckStatus !== 'valid';
+
+  const handleVerifyAtestaId = async () => {
+    if (!atestaCertificateId.trim()) return;
+    setAtestaCheckStatus('checking');
+    setAtestaCheckMessage('');
+    try {
+      const result: AtestaValidationResult = await validateAtestaCertificate(
+        atestaCertificateId.trim(),
+        candidateName,
+        candidateEmail
+      );
+      if (result.status === 'valid') {
+        setAtestaCheckStatus('valid');
+        setAtestaCheckMessage(`Verified — matches ${result.certificate.candidateName}.`);
+        setAtestaSkipped(false);
+      } else if (result.status === 'mismatch') {
+        setAtestaCheckStatus('invalid');
+        setAtestaCheckMessage(
+          `We noticed the certificate you provided is not yours — it belongs to ${result.ownerName}. Please provide the Atesta Certificate ID that matches your own details.`
+        );
+        setAtestaCertificateId('');
+      } else {
+        setAtestaCheckStatus('invalid');
+        setAtestaCheckMessage('Wrong Atesta ID');
+        setAtestaCertificateId('');
+      }
+    } catch (err: any) {
+      setAtestaCheckStatus('invalid');
+      setAtestaCheckMessage(err.message || 'Could not verify this ID right now. Please try again.');
+    }
+  };
+
   const handleSaveApplication = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (complianceIncomplete) {
       setError('Please answer every question and attach any required document before applying.');
+      return;
+    }
+
+    if (atestaIdIncomplete) {
+      setError('Please verify your Atesta Certificate ID, or choose to provide it later, before applying.');
       return;
     }
 
@@ -252,7 +300,8 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
         linkedinUrl: isTechRole ? linkedinUrl : undefined,
         portfolioUrl: isTechRole ? portfolioUrl : undefined,
         documents: uploadedDocuments,
-        complianceAnswers
+        complianceAnswers,
+        atestaCertificateId: atestaCheckStatus === 'valid' ? atestaCertificateId.trim() : null
       });
 
       setSaving(false);
@@ -612,6 +661,72 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
                         </div>
                       </div>
                     )}
+
+                    {q.id === 'hasApexCertificate' && answer === 'yes' && (
+                      <div className="border-t border-slate-200 pt-3 space-y-2">
+                        <label className="block text-[11px] font-bold text-slate-800">
+                          Atesta Certificate ID
+                        </label>
+                        {!atestaSkipped ? (
+                          <>
+                            <div className="flex gap-2">
+                              <input
+                                value={atestaCertificateId}
+                                onChange={(e) => {
+                                  setAtestaCertificateId(e.target.value);
+                                  setAtestaCheckStatus('idle');
+                                  setAtestaCheckMessage('');
+                                }}
+                                placeholder="e.g. ATC-2026-004821"
+                                className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleVerifyAtestaId}
+                                disabled={atestaCheckStatus === 'checking' || !atestaCertificateId.trim()}
+                                className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                {atestaCheckStatus === 'checking' ? 'Checking…' : 'Verify'}
+                              </button>
+                            </div>
+                            {atestaCheckMessage && (
+                              <p
+                                className={`text-[11px] font-semibold ${
+                                  atestaCheckStatus === 'valid' ? 'text-emerald-600' : 'text-rose-600'
+                                }`}
+                              >
+                                {atestaCheckMessage}
+                              </p>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAtestaSkipped(true);
+                                setAtestaCheckStatus('idle');
+                                setAtestaCheckMessage('');
+                                setAtestaCertificateId('');
+                              }}
+                              className="text-[11px] font-semibold text-slate-500 underline cursor-pointer"
+                            >
+                              I don't have my Certificate ID right now — I'll provide it later
+                            </button>
+                          </>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <p className="text-[11px] text-slate-500">
+                              You've chosen to provide your Atesta Certificate ID later.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setAtestaSkipped(false)}
+                              className="text-[11px] font-semibold text-indigo-600 underline cursor-pointer"
+                            >
+                              Actually, I have it
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -628,7 +743,7 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
               </button>
               <button
                 type="submit"
-                disabled={saving || complianceIncomplete}
+                disabled={saving || complianceIncomplete || atestaIdIncomplete}
                 className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-sm rounded-xl shadow-md transition cursor-pointer flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Submitting Application...' : 'Submit Application'}

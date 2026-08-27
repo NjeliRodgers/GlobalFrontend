@@ -249,3 +249,64 @@ export const approveApexCertificate = async (id: string): Promise<ApexCertificat
   if (!res.ok) throw new Error(data.error || 'Failed to approve certificate');
   return data.certificate;
 };
+
+export interface GenerateCertificatePayload {
+  candidateName: string;
+  candidateEmail?: string;
+  taglineText: string;
+  examScorePercent?: number | null;
+  screeningScorePercent?: number | null;
+  resultLabel: string;
+  verifyUrlText?: string;
+  signedByName: string;
+  signedByTitle: string;
+  recognitionText: string;
+  pdfBase64: string;
+}
+
+export const generateApexCertificate = async (payload: GenerateCertificatePayload): Promise<ApexCertificate> => {
+  const res = await apiFetch('/apex/certificates/generate', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to generate certificate');
+  return data.certificate;
+};
+
+export const updateApexCertificateFields = async (
+  id: string,
+  payload: Partial<GenerateCertificatePayload>
+): Promise<ApexCertificate> => {
+  const res = await apiFetch(`/apex/certificates/${id}`, {
+    method: 'PATCH',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to update certificate');
+  return data.certificate;
+};
+
+export type AtestaValidationResult =
+  | { status: 'valid'; certificate: { candidateName: string; sourceName: string; issuedAt: string } }
+  | { status: 'mismatch'; ownerName: string }
+  | { status: 'not_found'; error: string };
+
+export const validateAtestaCertificate = async (
+  certificateId: string,
+  candidateName: string,
+  candidateEmail: string
+): Promise<AtestaValidationResult> => {
+  const res = await apiFetch('/apex/certificates/validate-for-application', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify({ certificateId, candidateName, candidateEmail })
+  });
+  const data = await res.json();
+  if (res.status === 404 || res.status === 400) {
+    return { status: 'not_found', error: data.error || 'Wrong Atesta ID' };
+  }
+  return data;
+};

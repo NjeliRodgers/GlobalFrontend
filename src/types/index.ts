@@ -157,6 +157,8 @@ export interface Application {
   apexInterviewExpiresAt?: string;
 
   complianceAnswers?: Partial<Record<ComplianceQuestionId, 'yes' | 'no'>>;
+  atestaCertificateId?: string | null;
+  atestaCertificateVerified?: boolean;
   readinessProgress?: ReadinessProgress;
   readinessUpdatedAt?: string;
 }
@@ -262,10 +264,20 @@ export interface ApexCertificate {
   id: string;
   candidateId: string;
   candidateName: string;
-  sourceType: 'exam' | 'course' | 'package';
+  candidateEmail?: string | null;
+  sourceType: 'exam' | 'course' | 'package' | 'manual';
   sourceId: string;
   sourceName: string;
   verificationCode: string;
+  examScorePercent?: number | null;
+  screeningScorePercent?: number | null;
+  resultLabel?: string;
+  taglineText?: string;
+  verifyUrlText?: string | null;
+  signedByName?: string;
+  signedByTitle?: string;
+  recognitionText?: string;
+  generatedManually?: boolean;
   pdfUrl?: string | null;
   status: 'pending_approval' | 'approved';
   approvedAt?: string | null;

@@ -284,20 +284,26 @@ export const PipelinePage: React.FC<PipelinePageProps> = ({ initialJobId }) => {
                 <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                   <ClipboardCheck className="h-4 w-4 text-indigo-600" /> Compliance Answers
                 </h4>
-                {selectedApp.complianceAnswers ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {Object.entries(selectedApp.complianceAnswers).map(([key, value]) => (
-                      <div key={key} className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
-                        <span className="font-semibold text-slate-700 block">{COMPLIANCE_LABELS[key] || key}</span>
-                        <span className={`font-bold ${value === 'yes' ? 'text-emerald-700' : 'text-slate-600'}`}>
-                          {value.toUpperCase()}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-500 italic">No compliance answers were attached to this application.</p>
-                )}
+                {(() => {
+                  const answers = selectedApp.complianceAnswers;
+                  if (!answers) {
+                    return (
+                      <p className="text-xs text-slate-500 italic">No compliance answers were attached to this application.</p>
+                    );
+                  }
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {Object.entries(answers).map(([key, value]) => (
+                        <div key={key} className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                          <span className="font-semibold text-slate-700 block">{COMPLIANCE_LABELS[key] || key}</span>
+                          <span className={`font-bold ${value === 'yes' ? 'text-emerald-700' : 'text-slate-600'}`}>
+                            {(value || 'no').toUpperCase()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
