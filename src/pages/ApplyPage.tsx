@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Job, SubmittedDocument } from '../types';
 import { useAuth } from '../auth/AuthContext';
 import { submitApplication, fetchApplications, uploadApplicationDocument } from '../api/applicationsApi';
@@ -131,6 +131,7 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
   const [atestaSkipped, setAtestaSkipped] = useState(false);
   const [atestaCheckStatus, setAtestaCheckStatus] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
   const [atestaCheckMessage, setAtestaCheckMessage] = useState('');
+  const atestaQuestionRef = useRef<HTMLDivElement | null>(null);
 
   // Phase 6: compliance question answers + their conditional uploads
   const [complianceAnswers, setComplianceAnswers] = useState<Record<string, ComplianceAnswer>>(
@@ -212,38 +213,11 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
   // The Atesta question only blocks submission when the candidate said
   // "yes" and hasn't verified an ID and hasn't chosen "provide it later".
   const atestaAnswer = complianceAnswers['hasApexCertificate'];
-  const atestaIdIncomplete = atestaAnswer === 'yes' && !atestaSkipped && atestaCheckStatus !== 'valid';
+  // Only blocks Submit when they said "yes" and gave us nothing at all —
+  // the actual ID gets checked at submit time, in handleSaveApplication.
+  const atestaIdIncomplete = atestaAnswer === 'yes' && !atestaSkipped && !atestaCertificateId.trim();
 
-  const handleVerifyAtestaId = async () => {
-    if (!atestaCertificateId.trim()) return;
-    setAtestaCheckStatus('checking');
-    setAtestaCheckMessage('');
-    try {
-      const result: AtestaValidationResult = await validateAtestaCertificate(
-        atestaCertificateId.trim(),
-        candidateName,
-        candidateEmail
-      );
-      if (result.status === 'valid') {
-        setAtestaCheckStatus('valid');
-        setAtestaCheckMessage(`Verified — matches ${result.certificate.candidateName}.`);
-        setAtestaSkipped(false);
-      } else if (result.status === 'mismatch') {
-        setAtestaCheckStatus('invalid');
-        setAtestaCheckMessage(
-          `We noticed the certificate you provided is not yours — it belongs to ${result.ownerName}. Please provide the Atesta Certificate ID that matches your own details.`
-        );
-        setAtestaCertificateId('');
-      } else {
-        setAtestaCheckStatus('invalid');
-        setAtestaCheckMessage('Wrong Atesta ID');
-        setAtestaCertificateId('');
-      }
-    } catch (err: any) {
-      setAtestaCheckStatus('invalid');
-      setAtestaCheckMessage(err.message || 'Could not verify this ID right now. Please try again.');
-    }
-  };
+
 
   const handleSaveApplication = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -254,12 +228,50 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
     }
 
     if (atestaIdIncomplete) {
-      setError('Please verify your Atesta Certificate ID, or choose to provide it later, before applying.');
+      setError('Please enter your Atesta Certificate ID, or choose to provide it later, before applying.');
       return;
     }
 
     setSaving(true);
     setError('');
+
+    // The Atesta Certificate ID is checked now, at submit time — not while
+    // the candidate was still filling in the form. If it's wrong, we stop
+    // the submission and send them back up to the question; every other
+    // answer on the form stays exactly as they left it.
+    if (atestaAnswer === 'yes' && !atestaSkipped && atestaCheckStatus !== 'valid') {
+      setAtestaCheckStatus('checking');
+      setAtestaCheckMessage('');
+      try {
+        const result: AtestaValidationResult = await validateAtestaCertificate(
+          atestaCertificateId.trim(),
+          candidateName,
+          candidateEmail
+        );
+        if (result.status === 'valid') {
+          setAtestaCheckStatus('valid');
+          setAtestaCheckMessage(`Verified — matches ${result.certificate.candidateName}.`);
+        } else {
+          const message =
+            result.status === 'mismatch'
+              ? `We noticed the certificate you provided is not yours — it belongs to ${result.ownerName}. Please provide the Atesta Certificate ID that matches your own details.`
+              : 'This Atesta Certificate ID could not be found. Please check it and try again, or choose to provide it later.';
+          setAtestaCheckStatus('invalid');
+          setAtestaCheckMessage(message);
+          setSaving(false);
+          setError('Please fix your Atesta Certificate ID before we can submit your application.');
+          atestaQuestionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+      } catch (err: any) {
+        setAtestaCheckStatus('invalid');
+        setAtestaCheckMessage(err.message || 'Could not verify this ID right now. Please try again.');
+        setSaving(false);
+        setError('Please fix your Atesta Certificate ID before we can submit your application.');
+        atestaQuestionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+    }
 
     try {
       if (!resumeFile || !idFile) {
@@ -621,7 +633,11 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
                 const file = complianceFiles[q.id];
 
                 return (
-                  <div key={q.id} className="border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-3">
+                  <div
+                    key={q.id}
+                    ref={q.id === 'hasApexCertificate' ? atestaQuestionRef : undefined}
+                    className="border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-3"
+                  >
                     <p className="text-xs font-semibold text-slate-800 leading-relaxed">
                       {q.label} <span className="text-rose-600">*</span>
                     </p>
@@ -669,34 +685,21 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
                         </label>
                         {!atestaSkipped ? (
                           <>
-                            <div className="flex gap-2">
-                              <input
-                                value={atestaCertificateId}
-                                onChange={(e) => {
-                                  setAtestaCertificateId(e.target.value);
-                                  setAtestaCheckStatus('idle');
-                                  setAtestaCheckMessage('');
-                                }}
-                                placeholder="e.g. ATC-2026-004821"
-                                className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                              />
-                              <button
-                                type="button"
-                                onClick={handleVerifyAtestaId}
-                                disabled={atestaCheckStatus === 'checking' || !atestaCertificateId.trim()}
-                                className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                              >
-                                {atestaCheckStatus === 'checking' ? 'Checking…' : 'Verify'}
-                              </button>
-                            </div>
-                            {atestaCheckMessage && (
-                              <p
-                                className={`text-[11px] font-semibold ${
-                                  atestaCheckStatus === 'valid' ? 'text-emerald-600' : 'text-rose-600'
-                                }`}
-                              >
-                                {atestaCheckMessage}
-                              </p>
+                            <input
+                              value={atestaCertificateId}
+                              onChange={(e) => {
+                                setAtestaCertificateId(e.target.value);
+                                setAtestaCheckStatus('idle');
+                                setAtestaCheckMessage('');
+                              }}
+                              placeholder="e.g. ATC-2026-004821"
+                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                            <p className="text-[11px] text-slate-400">
+                              We'll check this against the Atesta database when you submit your application.
+                            </p>
+                            {atestaCheckMessage && atestaCheckStatus === 'invalid' && (
+                              <p className="text-[11px] font-semibold text-rose-600">{atestaCheckMessage}</p>
                             )}
                             <button
                               type="button"

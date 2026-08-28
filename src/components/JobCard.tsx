@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Job } from '../types';
-import { MapPin, Briefcase, Users, Bookmark, Calendar, Globe } from 'lucide-react';
+import { MapPin, Briefcase, Users, Bookmark, Calendar, Globe, Copy, Check } from 'lucide-react';
+import { JobExpiryCountdown } from './JobExpiryCountdown';
 
 interface JobCardProps {
   job: Job;
@@ -8,6 +9,9 @@ interface JobCardProps {
   onViewDetails: (job: Job) => void;
   isSavedInitial?: boolean;
   alreadyApplied?: boolean;
+  onCopyLink?: () => void;
+  isHighlighted?: boolean;
+  isCopied?: boolean;
 }
 
 export const JobCard: React.FC<JobCardProps> = ({
@@ -15,7 +19,10 @@ export const JobCard: React.FC<JobCardProps> = ({
   onApplyClick,
   onViewDetails,
   isSavedInitial = false,
-  alreadyApplied = false
+  alreadyApplied = false,
+  onCopyLink,
+  isHighlighted = false,
+  isCopied = false
 }) => {
   const [isSaved, setIsSaved] = useState(isSavedInitial);
 
@@ -25,7 +32,11 @@ export const JobCard: React.FC<JobCardProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs hover:shadow-md hover:border-[#1f4e79]/40 transition-all flex flex-col justify-between group relative">
+    <div
+      className={`bg-white rounded-xl border p-5 shadow-xs hover:shadow-md hover:border-[#1f4e79]/40 transition-all flex flex-col justify-between group relative ${
+        isHighlighted ? 'border-[#1f4e79] ring-2 ring-[#1f4e79]/40' : 'border-slate-200'
+      }`}
+    >
       <div>
         {/* Top Header Row with Save button at top right corner */}
         <div className="flex items-start justify-between gap-3 mb-2 pr-1">
@@ -41,19 +52,33 @@ export const JobCard: React.FC<JobCardProps> = ({
             </h3>
           </div>
 
-          {/* Top Right Save / Bookmark Button */}
-          <button
-            onClick={handleToggleSave}
-            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shrink-0 ${
-              isSaved
-                ? 'bg-amber-50 text-amber-700 border border-amber-200 shadow-xs'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
-            }`}
-            title={isSaved ? "Remove from saved jobs" : "Save job position"}
-          >
-            <Bookmark className={`h-3.5 w-3.5 ${isSaved ? 'fill-amber-500 text-amber-500' : ''}`} />
-            <span>{isSaved ? 'Saved' : 'Save'}</span>
-          </button>
+          {/* Top Right Copy Link / Save Buttons */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {onCopyLink && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCopyLink();
+                }}
+                className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+                title="Copy link to this job"
+              >
+                {isCopied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+              </button>
+            )}
+            <button
+              onClick={handleToggleSave}
+              className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                isSaved
+                  ? 'bg-amber-50 text-amber-700 border border-amber-200 shadow-xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+              }`}
+              title={isSaved ? "Remove from saved jobs" : "Save job position"}
+            >
+              <Bookmark className={`h-3.5 w-3.5 ${isSaved ? 'fill-amber-500 text-amber-500' : ''}`} />
+              <span>{isSaved ? 'Saved' : 'Save'}</span>
+            </button>
+          </div>
         </div>
 
         <p className="text-sm text-slate-600 line-clamp-2 mb-4 leading-relaxed">
@@ -75,10 +100,10 @@ export const JobCard: React.FC<JobCardProps> = ({
           <span className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-100 rounded-lg font-bold text-emerald-800">
             Salary: {job.salaryRange}
           </span>
-          {job.deadline && (
+          {job.expiresAt && (
             <span className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 border border-amber-100 rounded-lg font-semibold text-amber-800">
               <Calendar className="h-3.5 w-3.5 text-amber-600" />
-              Deadline: {job.deadline}
+              <JobExpiryCountdown expiresAt={job.expiresAt} />
             </span>
           )}
           <span className="flex items-center gap-1 px-2.5 py-1 bg-slate-50 border border-slate-100 rounded-lg">

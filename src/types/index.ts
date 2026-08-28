@@ -54,6 +54,7 @@ export interface Job {
   apexPackageIds?: string[];
   postedAt: string;
   deadline?: string;
+  expiresAt?: string | null;
 }
 
 export type ApplicationStage =
@@ -343,7 +344,7 @@ export interface EmailLog {
   fullBody: string;
   sentAt: string;
   status: 'delivered' | 'sent' | 'failed';
-triggerEvent: 'assessment_pass' | 'assessment_fail' | 'assessment_completed' | 'interview_pass' | 'interview_fail' | 'application_received' | 'interview_scheduled' | 'stage_change' | 'password_reset' | 'account_activation' | 'apex_enrollment_payment_received' | 'custom';  pdfAttachmentName?: string;
+triggerEvent: 'assessment_pass' | 'assessment_fail' | 'assessment_completed' | 'interview_pass' | 'interview_fail' | 'application_received' | 'interview_scheduled' | 'stage_change' | 'password_reset' | 'account_activation' | 'apex_enrollment_payment_received' | 'national_id_recovery' | 'custom';  pdfAttachmentName?: string;
   pdfDataUrl?: string;
 }
 

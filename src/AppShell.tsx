@@ -35,7 +35,7 @@ const parseHash = (): { tab: string; id?: string } => {
 };
 
 const buildHash = (tab: string, id?: string): string => {
-  if ((JOB_SCOPED_TABS.has(tab) || APPLICATION_SCOPED_TABS.has(tab)) && id) {
+  if ((JOB_SCOPED_TABS.has(tab) || APPLICATION_SCOPED_TABS.has(tab) || tab === 'job_board') && id) {
     return `#/${tab}/${id}`;
   }
   return `#/${tab}`;
@@ -88,6 +88,12 @@ export const AppShell: React.FC = () => {
   // Active selections
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
+  // The job a "copy link" URL points at, e.g. #/job_board/job-123 — pinned
+  // to the top of the job board list, not opened into its own page.
+  const [highlightedJobId, setHighlightedJobId] = useState<string | undefined>(
+    initialHash.tab === 'job_board' ? initialHash.id : undefined
+  );
+
   useEffect(() => {
     if (!initialHash.id || !JOB_SCOPED_TABS.has(initialHash.tab)) return;
     fetchJobById(initialHash.id).then((job) => {
@@ -104,9 +110,13 @@ export const AppShell: React.FC = () => {
   // sharing the link) restores the same tab/job/application instead of the
   // home page.
   useEffect(() => {
-    const id = APPLICATION_SCOPED_TABS.has(activeTab) ? readinessApplicationId : selectedJob?.id;
+    const id = APPLICATION_SCOPED_TABS.has(activeTab)
+      ? readinessApplicationId
+      : activeTab === 'job_board'
+      ? highlightedJobId
+      : selectedJob?.id;
     window.history.replaceState({}, '', buildHash(activeTab, id));
-  }, [activeTab, selectedJob?.id, readinessApplicationId]);
+  }, [activeTab, selectedJob?.id, readinessApplicationId, highlightedJobId]);
 
   const handleApplicationSubmitted = (applicationId: string) => {
     setReadinessApplicationId(applicationId);
@@ -185,6 +195,7 @@ export const AppShell: React.FC = () => {
         <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 min-w-0">
           {activeTab === 'job_board' && (
             <JobBoardPage
+              highlightJobId={highlightedJobId}
               onSelectJobForDetails={handleSelectJobForDetails}
               onSelectJobForApply={handleSelectJobForApply}
               onNavigateToSponsorship={() => setActiveTab('sponsorship_process')}

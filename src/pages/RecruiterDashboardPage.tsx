@@ -42,6 +42,8 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
   const [newWorkType, setNewWorkType] = useState('Full-Time');
   const [newSalary, setNewSalary] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  const [expiryAmount, setExpiryAmount] = useState('');
+  const [expiryUnit, setExpiryUnit] = useState<'hours' | 'days' | 'weeks' | 'months'>('days');
   const [newApexPackageIds, setNewApexPackageIds] = useState<string[]>([]);
   const [packagePickerValue, setPackagePickerValue] = useState('');
   const [newJobError, setNewJobError] = useState('');
@@ -92,6 +94,17 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
       return;
     }
 
+    let computedExpiresAt: string | undefined;
+    if (expiryAmount && Number(expiryAmount) > 0) {
+      const amount = Number(expiryAmount);
+      const expires = new Date();
+      if (expiryUnit === 'months') expires.setMonth(expires.getMonth() + amount);
+      else if (expiryUnit === 'weeks') expires.setDate(expires.getDate() + amount * 7);
+      else if (expiryUnit === 'days') expires.setDate(expires.getDate() + amount);
+      else if (expiryUnit === 'hours') expires.setHours(expires.getHours() + amount);
+      computedExpiresAt = expires.toISOString();
+    }
+
     const jobPayload: any = {
       title: newTitle,
       department: newDepartment,
@@ -101,6 +114,7 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
       description: newDescription || 'Join our high-performing team to build scalable enterprise solutions.',
       apexPackageIds: selectedPackages.map((p) => p.packageId || p.id)
     };
+    if (computedExpiresAt) jobPayload.expiresAt = computedExpiresAt;
 
     // Only stamp default status/benefits on a brand-new posting — editing an
     // existing job must never silently reactivate it or wipe its benefits.
@@ -121,6 +135,8 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
       setNewTitle('');
       setNewDescription('');
       setNewApexPackageIds([]);
+      setExpiryAmount('');
+      setExpiryUnit('days');
       loadDashboardData();
     } catch (err: any) {
       setNewJobError(
@@ -381,6 +397,33 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Application Deadline</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    value={expiryAmount}
+                    onChange={(e) => setExpiryAmount(e.target.value)}
+                    placeholder="e.g. 30"
+                    className="w-24 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <select
+                    value={expiryUnit}
+                    onChange={(e) => setExpiryUnit(e.target.value as any)}
+                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="hours">Hours</option>
+                    <option value="days">Days</option>
+                    <option value="weeks">Weeks</option>
+                    <option value="months">Months</option>
+                  </select>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Leave blank to keep this posting open indefinitely.
+                </p>
               </div>
 
               <div>

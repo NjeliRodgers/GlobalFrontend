@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Job } from '../types';
-import { fetchJobs } from '../api/jobsApi';
+import { fetchJobs, fetchJobById } from '../api/jobsApi';
 import { fetchApplications } from '../api/applicationsApi';
 import { JobCard } from '../components/JobCard';
 import { JobFilter } from '../components/JobFilter';
@@ -12,14 +12,18 @@ interface JobBoardPageProps {
   onSelectJobForApply: (job: Job) => void;
   onNavigateToSponsorship?: () => void;
   onNavigateToFunding?: () => void;
+  highlightJobId?: string;
 }
 
 export const JobBoardPage: React.FC<JobBoardPageProps> = ({
   onSelectJobForDetails,
   onSelectJobForApply,
   onNavigateToSponsorship,
-  onNavigateToFunding
+  onNavigateToFunding,
+  highlightJobId
 }) => {
+  const [copiedJobId, setCopiedJobId] = useState<string | null>(null);
+  const highlightRef = useRef<HTMLDivElement | null>(null);
   const { isAuthenticated, user, openAuthModal } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +56,39 @@ export const JobBoardPage: React.FC<JobBoardPageProps> = ({
     const data = await fetchJobs();
     setJobs(data);
     setLoading(false);
+  };
+
+  // If someone opens a copied link to a job that isn't in the normal
+  // fetched list for some reason, fetch it directly and splice it in.
+  useEffect(() => {
+    if (!highlightJobId || loading) return;
+    if (jobs.some((j) => j.id === highlightJobId)) return;
+    fetchJobById(highlightJobId).then((job) => {
+      if (job) setJobs((current) => [job, ...current]);
+    });
+  }, [highlightJobId, jobs, loading]);
+
+  // Scroll the highlighted job into view once it's rendered.
+  useEffect(() => {
+    if (highlightJobId && !loading && highlightRef.current) {
+      highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [highlightJobId, loading]);
+
+  const handleCopyLink = async (job: Job) => {
+    const url = `${window.location.origin}${window.location.pathname}#/job_board/${job.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = url;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+    setCopiedJobId(job.id);
+    setTimeout(() => setCopiedJobId((current) => (current === job.id ? null : current)), 2000);
   };
 
   // Filter logic
@@ -230,15 +267,21 @@ export const JobBoardPage: React.FC<JobBoardPageProps> = ({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredJobs.map((job) => (
-            <JobCard
-              key={job.id}
-              job={job}
-              onApplyClick={handleApplyClick}
-              onViewDetails={onSelectJobForDetails}
-              alreadyApplied={appliedJobIds.has(job.id)}
-            />
-          ))}
+          {[...filteredJobs]
+            .sort((a, b) => (a.id === highlightJobId ? -1 : b.id === highlightJobId ? 1 : 0))
+            .map((job) => (
+              <div key={job.id} ref={job.id === highlightJobId ? highlightRef : undefined}>
+                <JobCard
+                  job={job}
+                  onApplyClick={handleApplyClick}
+                  onViewDetails={onSelectJobForDetails}
+                  alreadyApplied={appliedJobIds.has(job.id)}
+                  isHighlighted={job.id === highlightJobId}
+                  isCopied={copiedJobId === job.id}
+                  onCopyLink={() => handleCopyLink(job)}
+                />
+              </div>
+            ))}
         </div>
       )}
     </div>
