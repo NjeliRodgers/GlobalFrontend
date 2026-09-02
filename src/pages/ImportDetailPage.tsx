@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../auth/AuthContext';
+import { AvatarCircle } from '../components/AvatarCircle';
 import {
   Application,
   ApexPackage,
@@ -28,7 +30,10 @@ import {
   ArrowLeft,
   Loader2,
   Copy,
-  Check
+  Check,
+  Mail,
+  Phone,
+  CalendarDays
 } from 'lucide-react';
 
 interface ImportDetailPageProps {
@@ -86,6 +91,7 @@ const CircularProgress: React.FC<{ percentage: number }> = ({ percentage }) => {
 };
 
 export const ImportDetailPage: React.FC<ImportDetailPageProps> = ({ applicationId, onBackToJobBoard }) => {
+  const { user } = useAuth();
   const [application, setApplication] = useState<Application | null>(null);
   const [readinessProgress, setReadinessProgress] = useState<ReadinessProgress | null>(null);
   const [voucher, setVoucher] = useState<ApplicationVoucher | null>(null);
@@ -94,6 +100,7 @@ export const ImportDetailPage: React.FC<ImportDetailPageProps> = ({ applicationI
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [codeCopied, setCodeCopied] = useState(false);
+  const [copiedPackageId, setCopiedPackageId] = useState<string | null>(null);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
 
   const loadReadiness = async () => {
@@ -192,6 +199,46 @@ export const ImportDetailPage: React.FC<ImportDetailPageProps> = ({ applicationI
 
       {error && (
         <div className="p-3 bg-rose-50 text-rose-700 text-xs rounded-xl border border-rose-200">{error}</div>
+      )}
+
+      {/* Candidate Profile */}
+      {user && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+            <AvatarCircle name={user.name} avatarUrl={user.avatar} size="lg" />
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 truncate">{user.name}</h2>
+              <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-slate-600">
+                <span className="flex items-center gap-1.5">
+                  <Mail className="h-3.5 w-3.5 text-slate-400" />
+                  {user.email}
+                </span>
+                {user.phone && (
+                  <span className="flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5 text-slate-400" />
+                    {user.phone}
+                  </span>
+                )}
+                {user.location && (
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                    {user.location}
+                  </span>
+                )}
+                {user.createdAt && (
+                  <span className="flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
+                    Member since{' '}
+                    {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </span>
+                )}
+              </div>
+              <span className="inline-block mt-1 text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                Candidate Account
+              </span>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Header */}
@@ -324,7 +371,25 @@ export const ImportDetailPage: React.FC<ImportDetailPageProps> = ({ applicationI
             <div key={pkg.id} className="border border-slate-200 rounded-xl p-3 bg-slate-50">
               <p className="text-[11px] text-slate-500">Assigned Package</p>
               <p className="text-sm font-extrabold text-slate-900">{pkg.name}</p>
-              <p className="text-xs font-bold text-indigo-700">ID: {pkg.id}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <p className="text-xs font-bold text-indigo-700">ID: {pkg.id}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(pkg.id).then(() => {
+                      setCopiedPackageId(pkg.id);
+                      setTimeout(() => setCopiedPackageId((current) => (current === pkg.id ? null : current)), 2000);
+                    });
+                  }}
+                  className="p-1 rounded-md border border-indigo-200 bg-white hover:bg-indigo-100 text-indigo-700 transition cursor-pointer"
+                  title="Copy package ID"
+                >
+                  {copiedPackageId === pkg.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                </button>
+                {copiedPackageId === pkg.id && (
+                  <span className="text-[10px] font-semibold text-emerald-700">Copied!</span>
+                )}
+              </div>
             </div>
           ))}
         </div>

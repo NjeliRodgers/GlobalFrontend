@@ -8,7 +8,8 @@ import {
   ShieldCheck,
   FolderLock,
   Sliders,
-  Wallet
+  Wallet,
+  LifeBuoy
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { tab: 'document_vault', label: ' Document storage Vault', icon: FolderLock, iconColor: 'text-sky-400' },
   { tab: 'team_rbac', label: 'RBAC & Team Access Control', icon: ShieldCheck, iconColor: 'text-rose-400' },
   { tab: 'apex_recruiter', label: 'Atesta System Admin Control', icon: Sliders, iconColor: 'text-purple-400' },
+  { tab: 'candidate_control_panel', label: 'Candidate Control Panel', icon: LifeBuoy, iconColor: 'text-teal-400' },
 ];
 
 const CANDIDATE_NAV_ITEMS = [
@@ -45,11 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
 
   const items = isRecruiterOrAdmin ? NAV_ITEMS : CANDIDATE_NAV_ITEMS;
   const sectionLabel = isRecruiterOrAdmin ? 'Global Talent Plus Operations' : 'My Sponsorship';
-  const mobileCandidateVisibility = isCandidate
-    ? isOpen
-      ? 'translate-x-0'
-      : '-translate-x-full'
-    : 'translate-x-0';
+  const mobileVisibility = isOpen ? 'translate-x-0' : '-translate-x-full';
 
   return (
     <>
@@ -59,7 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
       )}
 
       <aside
-        className={`fixed md:sticky top-16 z-40 h-[calc(100vh-4rem)] bg-slate-900 text-white flex flex-col justify-between border-r border-slate-800 shrink-0 transform transition-[width,transform] duration-200 ${mobileCandidateVisibility} ${
+        className={`fixed md:sticky top-16 z-40 h-[calc(100vh-4rem)] bg-slate-900 text-white flex flex-col justify-between border-r border-slate-800 shrink-0 transform transition-[width,transform] duration-200 ${mobileVisibility} md:translate-x-0 ${
           isOpen ? 'w-64' : 'w-[72px]'
         }`}
       >

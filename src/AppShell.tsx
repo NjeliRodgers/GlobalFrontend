@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from './auth/AuthContext';
 import { Job } from './types';
 import { Navbar } from './components/Navbar';
@@ -11,6 +11,7 @@ import { FundingDashboardPage } from './pages/FundingDashboardPage';
 import { JobDetailPage } from './pages/JobDetailPage';
 import { ApplyPage } from './pages/ApplyPage';
 import { ApexRecruiterPage } from './pages/ApexRecruiterPage';
+import { CandidateControlPanelPage } from './pages/CandidateControlPanelPage';
 import { CandidatePortalPage } from './pages/CandidatePortalPage';
 import { RecruiterDashboardPage } from './pages/RecruiterDashboardPage';
 import { PipelinePage } from './pages/PipelinePage';
@@ -26,6 +27,11 @@ import { ResetPasswordForm } from './auth/ResetPasswordForm';
 
 const JOB_SCOPED_TABS = new Set(['job_detail', 'apply', 'pipeline']);
 const APPLICATION_SCOPED_TABS = new Set(['import_detail']);
+
+// The only screens a signed-out visitor may see: the public job board and
+// an individual job's public description page. Everything else — for any
+// role — requires being logged in.
+const PUBLIC_TABS = new Set(['job_board', 'job_detail']);
 
 const parseHash = (): { tab: string; id?: string } => {
   const raw = window.location.hash.replace(/^#\/?/, '');
@@ -51,11 +57,13 @@ export const AppShell: React.FC = () => {
   const { isAuthenticated, pendingJobId, clearPendingJobId } = useAuth();
 
   const initialHash = parseHash();
-  const [activeTab, setActiveTab] = useState(initialHash.tab || 'job_board');
+  const [activeTab, setActiveTab] = useState(
+    PUBLIC_TABS.has(initialHash.tab) || isAuthenticated ? initialHash.tab || 'job_board' : 'job_board'
+  );
   const [resolvingHashJob, setResolvingHashJob] = useState(
     Boolean(initialHash.id) && JOB_SCOPED_TABS.has(initialHash.tab)
   );
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 768);
   const [readinessApplicationId, setReadinessApplicationId] = useState<string | undefined>(
     APPLICATION_SCOPED_TABS.has(initialHash.tab) ? initialHash.id : undefined
   );
@@ -88,11 +96,28 @@ export const AppShell: React.FC = () => {
   // Active selections
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
-  // The job a "copy link" URL points at, e.g. #/job_board/job-123 — pinned
-  // to the top of the job board list, not opened into its own page.
   const [highlightedJobId, setHighlightedJobId] = useState<string | undefined>(
     initialHash.tab === 'job_board' ? initialHash.id : undefined
   );
+
+  const wasAuthenticatedRef = useRef(isAuthenticated);
+
+  useEffect(() => {
+    const wasAuthenticated = wasAuthenticatedRef.current;
+    wasAuthenticatedRef.current = isAuthenticated;
+
+    if (wasAuthenticated && !isAuthenticated) {
+      setActiveTab('job_board');
+      setSelectedJob(null);
+      setReadinessApplicationId(undefined);
+      setHighlightedJobId(undefined);
+      return;
+    }
+
+    if (!isAuthenticated && !PUBLIC_TABS.has(activeTab)) {
+      setActiveTab('job_board');
+    }
+  }, [isAuthenticated, activeTab]);
 
   useEffect(() => {
     if (!initialHash.id || !JOB_SCOPED_TABS.has(initialHash.tab)) return;
@@ -106,9 +131,6 @@ export const AppShell: React.FC = () => {
     });
   }, []);
 
-  // Keep the address bar in sync with in-app navigation so refreshing (or
-  // sharing the link) restores the same tab/job/application instead of the
-  // home page.
   useEffect(() => {
     const id = APPLICATION_SCOPED_TABS.has(activeTab)
       ? readinessApplicationId
@@ -180,6 +202,10 @@ export const AppShell: React.FC = () => {
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        onOpenApplicationProgress={(applicationId) => {
+          setReadinessApplicationId(applicationId);
+          setActiveTab('import_detail');
+        }}
       />
 
       <div className="flex-1 w-full flex items-start">
@@ -219,7 +245,7 @@ export const AppShell: React.FC = () => {
             />
           )}
 
-          {activeTab === 'apply' && selectedJob && (
+          {activeTab === 'apply' && selectedJob && isAuthenticated && (
             <ApplyPage
               job={selectedJob}
               onBack={() => setActiveTab('job_board')}
@@ -227,16 +253,18 @@ export const AppShell: React.FC = () => {
             />
           )}
 
-          {activeTab === 'import_detail' && readinessApplicationId && (
+          {activeTab === 'import_detail' && readinessApplicationId && isAuthenticated && (
             <ImportDetailPage
               applicationId={readinessApplicationId}
               onBackToJobBoard={() => setActiveTab('job_board')}
             />
           )}
 
-          {activeTab === 'apex_recruiter' && <ApexRecruiterPage />}
+          {activeTab === 'apex_recruiter' && isAuthenticated && <ApexRecruiterPage />}
 
-          {activeTab === 'candidate_portal' && (
+          {activeTab === 'candidate_control_panel' && isAuthenticated && <CandidateControlPanelPage />}
+
+          {activeTab === 'candidate_portal' && isAuthenticated && (
             <CandidatePortalPage
               onViewReadiness={(applicationId) => {
                 setReadinessApplicationId(applicationId);
@@ -245,7 +273,7 @@ export const AppShell: React.FC = () => {
             />
           )}
 
-          {activeTab === 'recruiter_dashboard' && (
+          {activeTab === 'recruiter_dashboard' && isAuthenticated && (
             <RecruiterDashboardPage
               onNavigateToPipeline={async (jobId) => {
                 if (jobId) {
@@ -260,22 +288,22 @@ export const AppShell: React.FC = () => {
             />
           )}
 
-          {activeTab === 'pipeline' && (
+          {activeTab === 'pipeline' && isAuthenticated && (
             <CandidatesDirectoryPage
               initialJobId={selectedJob?.id}
               initialJobTitle={selectedJob?.title}
             />
           )}
 
-          {activeTab === 'interviews' && <InterviewSchedulerPage />}
+          {activeTab === 'interviews' && isAuthenticated && <InterviewSchedulerPage />}
 
-          {activeTab === 'email_logs' && <EmailLogsPage />}
+          {activeTab === 'email_logs' && isAuthenticated && <EmailLogsPage />}
 
-          {activeTab === 'document_vault' && <DocumentVaultPage />}
+          {activeTab === 'document_vault' && isAuthenticated && <DocumentVaultPage />}
 
-          {activeTab === 'team_rbac' && <TeamRbacPage />}
+          {activeTab === 'team_rbac' && isAuthenticated && <TeamRbacPage />}
 
-          {activeTab === 'candidates_directory' && <CandidatesDirectoryPage />}
+          {activeTab === 'candidates_directory' && isAuthenticated && <CandidatesDirectoryPage />}
         </main>
       </div>
 

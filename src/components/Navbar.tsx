@@ -1,20 +1,39 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { AvatarCircle } from './AvatarCircle';
-import { Briefcase, Menu, ChevronDown, User, Globe, Layers, LogOut } from 'lucide-react';
+import { Briefcase, Menu, ChevronDown, User, Globe, Layers, LogOut, ClipboardList } from 'lucide-react';
+import { fetchApplications } from '../api/applicationsApi';
+import { Application } from '../types';
 
 interface NavbarProps {
   onToggleSidebar: () => void;
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  onOpenApplicationProgress: (applicationId: string) => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, activeTab, setActiveTab }) => {
+export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, activeTab, setActiveTab, onOpenApplicationProgress }) => {
   const { user, role, isAuthenticated, logout, openAuthModal } = useAuth();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const isRecruiterOrAdmin = role === 'recruiter' || role === 'admin' || role === 'hiring_manager';
+
+  const [myApplications, setMyApplications] = useState<Application[]>([]);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.id) {
+      fetchApplications({ candidateId: user.id }).then(setMyApplications);
+    } else {
+      setMyApplications([]);
+    }
+  }, [isAuthenticated, user?.id]);
+
+  const latestApplicationId = myApplications.length > 0
+    ? [...myApplications].sort(
+        (a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime()
+      )[0].id
+    : null;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -98,6 +117,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, activeTab, setA
                   Hiring Pipeline
                 </button>
               </>
+            )}
+
+            {latestApplicationId && (
+              <button
+                onClick={() => onOpenApplicationProgress(latestApplicationId)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+                  activeTab === 'import_detail'
+                    ? 'bg-indigo-50 text-indigo-700'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+              >
+                <ClipboardList className="h-3.5 w-3.5" />
+                Application Progress
+              </button>
             )}
 
             {role === 'candidate' && (
