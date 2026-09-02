@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '../auth/AuthContext';
 import {
   Briefcase,
+  Globe,
   Layers,
   Calendar,
   Mail,
@@ -9,7 +10,9 @@ import {
   FolderLock,
   Sliders,
   Wallet,
-  LifeBuoy
+  LifeBuoy,
+  UserRound,
+  Users
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -20,8 +23,10 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS = [
+  { tab: 'job_board', label: 'Public Job Openings', icon: Globe, iconColor: 'text-slate-300' },
   { tab: 'recruiter_dashboard', label: 'Recruiter Dashboard', icon: Briefcase, iconColor: 'text-[#5b8bb5]' },
   { tab: 'pipeline', label: 'Candidate Hiring Pipeline', icon: Layers, iconColor: 'text-[#5b8bb5]' },
+  { tab: 'candidates_directory', label: 'Candidates Directory & Analytics', icon: Users, iconColor: 'text-indigo-400' },
   { tab: 'interviews', label: 'Interview Scheduling Center', icon: Calendar, iconColor: 'text-emerald-400' },
   { tab: 'email_logs', label: ' Email Logs and Archive', icon: Mail, iconColor: 'text-amber-400' },
   { tab: 'document_vault', label: ' Document storage Vault', icon: FolderLock, iconColor: 'text-sky-400' },
@@ -31,6 +36,8 @@ const NAV_ITEMS = [
 ];
 
 const CANDIDATE_NAV_ITEMS = [
+  { tab: 'job_board', label: 'Browse Job Openings', icon: Globe, iconColor: 'text-slate-300' },
+  { tab: 'candidate_portal', label: 'Candidate Console', icon: UserRound, iconColor: 'text-indigo-400' },
   { tab: 'sponsorship_process', label: 'Sponsorship Process', icon: Layers, iconColor: 'text-[#5b8bb5]' },
   { tab: 'funding_dashboard', label: 'Funding Dashboard', icon: Wallet, iconColor: 'text-emerald-400' },
 ];

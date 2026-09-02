@@ -119,25 +119,82 @@ export const AppShell: React.FC = () => {
     }
   }, [isAuthenticated, activeTab]);
 
-  useEffect(() => {
-    if (!initialHash.id || !JOB_SCOPED_TABS.has(initialHash.tab)) return;
-    fetchJobById(initialHash.id).then((job) => {
-      if (job) {
-        setSelectedJob(job);
-      } else {
+  const applyHashRoute = async (route: { tab: string; id?: string }, showLoader = false) => {
+    const { tab, id } = route;
+
+    if (tab === 'job_board') {
+      setHighlightedJobId(id);
+      setActiveTab('job_board');
+      return;
+    }
+
+    if (APPLICATION_SCOPED_TABS.has(tab)) {
+      if (!id) {
         setActiveTab('job_board');
+        return;
       }
-      setResolvingHashJob(false);
-    });
+      setReadinessApplicationId(id);
+      setActiveTab(tab);
+      return;
+    }
+
+    if (JOB_SCOPED_TABS.has(tab)) {
+      if (!id) {
+        setActiveTab('job_board');
+        return;
+      }
+
+      if (showLoader) {
+        setResolvingHashJob(true);
+      }
+
+      try {
+        const job = await fetchJobById(id);
+        if (job) {
+          setSelectedJob(job);
+          setActiveTab(tab);
+        } else {
+          setActiveTab('job_board');
+        }
+      } finally {
+        if (showLoader) {
+          setResolvingHashJob(false);
+        }
+      }
+      return;
+    }
+
+    setActiveTab(tab || 'job_board');
+  };
+
+  useEffect(() => {
+    void applyHashRoute(initialHash, true);
   }, []);
 
+  useEffect(() => {
+    const handleHashChange = () => {
+      void applyHashRoute(parseHash(), true);
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, [selectedJob?.id]);
+
+  // Keep the address bar in sync with in-app navigation so refreshing (or
+  // sharing the link) restores the same tab/job/application instead of the
+  // home page.
   useEffect(() => {
     const id = APPLICATION_SCOPED_TABS.has(activeTab)
       ? readinessApplicationId
       : activeTab === 'job_board'
       ? highlightedJobId
       : selectedJob?.id;
-    window.history.replaceState({}, '', buildHash(activeTab, id));
+    const nextHash = buildHash(activeTab, id);
+    if (window.location.hash !== nextHash) {
+      window.location.hash = nextHash;
+    }
   }, [activeTab, selectedJob?.id, readinessApplicationId, highlightedJobId]);
 
   const handleApplicationSubmitted = (applicationId: string) => {
@@ -288,12 +345,7 @@ export const AppShell: React.FC = () => {
             />
           )}
 
-          {activeTab === 'pipeline' && isAuthenticated && (
-            <CandidatesDirectoryPage
-              initialJobId={selectedJob?.id}
-              initialJobTitle={selectedJob?.title}
-            />
-          )}
+          {activeTab === 'pipeline' && isAuthenticated && <PipelinePage initialJobId={selectedJob?.id} />}
 
           {activeTab === 'interviews' && isAuthenticated && <InterviewSchedulerPage />}
 
