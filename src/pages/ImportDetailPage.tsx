@@ -302,72 +302,103 @@ export const ImportDetailPage: React.FC<ImportDetailPageProps> = ({ applicationI
           </p>
         </div>
       )}
+{/* Atesta panel */}
+<div className="bg-white rounded-2xl border border-indigo-200 p-6 sm:p-8 shadow-xs space-y-4">
+  <div className="flex items-center gap-2">
+    <Award className="h-5 w-5 text-indigo-600" />
+    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Guidelines to Atesta Training Certification Program</h3>
+  </div>
 
-      {/* Atesta panel */}
-      <div className="bg-white rounded-2xl border border-indigo-200 p-6 sm:p-8 shadow-xs space-y-4">
-        <div className="flex items-center gap-2">
-          <Award className="h-5 w-5 text-indigo-600" />
-          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Atesta Training Certification</h3>
-        </div>
-
-        <p className="text-xs text-slate-600 leading-relaxed">
-          This role requires the following certification package(s). Global Talent Plus has a funding
-          partnership with Atesta Training Certification: we help cover part of your course fee, and you pay
-          only the remaining balance to complete your certification.
-        </p>
-
-        {assignedPackages.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {assignedPackages.map((pkg) => (
-              <div key={pkg.id} className="border border-slate-200 rounded-xl p-3 bg-slate-50">
-                <p className="text-[11px] text-slate-500">Assigned Package</p>
-                <p className="text-sm font-extrabold text-slate-900">{pkg.name}</p>
-                <p className="text-xs font-bold text-indigo-700">ID: {pkg.id}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {voucher && (
-          <div className="border border-dashed border-indigo-300 rounded-xl p-4 bg-indigo-50/60 flex flex-col sm:flex-row sm:items-center gap-3">
-            <KeyRound className="h-5 w-5 text-indigo-600 shrink-0" />
-            <div className="flex-1">
-              <p className="text-[11px] font-semibold text-slate-600">
-                Your one-time Atesta access code
-                {voucher.redeemedAt ? ' (already used)' : ''}:
-              </p>
-              <div className="flex items-center gap-2 mt-0.5">
-                <p className="text-lg font-extrabold tracking-widest text-indigo-800">{voucher.code}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(voucher.code).then(() => {
-                      setCodeCopied(true);
-                      setTimeout(() => setCodeCopied(false), 2000);
-                    });
-                  }}
-                  className="p-1.5 rounded-md border border-indigo-200 bg-white hover:bg-indigo-100 text-indigo-700 transition cursor-pointer"
-                  title="Copy code"
-                >
-                  {codeCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                </button>
-                {codeCopied && <span className="text-[11px] font-semibold text-emerald-700">Copied!</span>}
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1">
-                This code is unique to your application and can only be used once. Use it on the Atesta
-                platform to access your funded course.
-              </p>
+  <ol className="text-xs text-slate-600 space-y-3 list-decimal list-inside">
+    <li>
+      If you don't have an Atesta Certificate, create an account on the Atesta website. Use this link :{' '}
+      <a href="https://atesta.mobit.co.ke/" target="_blank" rel="noopener noreferrer" className="font-semibold text-indigo-700 underline">
+        https://atesta.mobit.co.ke/
+      </a>
+    </li>
+    <li>
+      After creating an account, search for the package assigned to you that matches the job position you are applying for.
+      {assignedPackages.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+          {assignedPackages.map((pkg) => (
+            <div key={pkg.id} className="border border-slate-200 rounded-xl p-3 bg-slate-50">
+              <p className="text-[11px] text-slate-500">Assigned Package</p>
+              <p className="text-sm font-extrabold text-slate-900">{pkg.name}</p>
+              <p className="text-xs font-bold text-indigo-700">ID: {pkg.id}</p>
             </div>
+          ))}
+        </div>
+      )}
+    </li>
+    <li>After finding your training and certification package, click on the "View Package &amp; Start" button.</li>
+    <li>
+      That lands you on the instruction page where you are required to read and understand what Atesta certification is all about.
+      This information is provided by the Atesta certification program and approved by the International Job Association Board.
+    </li>
+    <li>
+      After reading and understanding, click Accept you can then start or access the exams and courses. However, the screening
+      interview is only accessible to candidates who have completed and passed their exams.
+    </li>
+    <li>
+      Global Talent Plus has a partnership program with Atesta Job Training. Through this partnership, we always provide a voucher
+      code so candidates can access the course materials and study for free choose "Global Talent Plus" from the dropdown and use
+      the code below to access the course material.
+      {voucher && (
+        <div className="border border-dashed border-indigo-300 rounded-xl p-4 bg-indigo-50/60 flex flex-col sm:flex-row sm:items-center gap-3 mt-3">
+          <KeyRound className="h-5 w-5 text-indigo-600 shrink-0" />
+          <div className="flex-1">
+            <p className="text-[11px] font-semibold text-slate-600">
+              Your one-time Atesta access code
+              {voucher.redeemedAt ? ' (already used)' : ''}:
+            </p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-lg font-extrabold tracking-widest text-indigo-800">{voucher.code}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(voucher.code).then(() => {
+                    setCodeCopied(true);
+                    setTimeout(() => setCodeCopied(false), 2000);
+                  });
+                }}
+                className="p-1.5 rounded-md border border-indigo-200 bg-white hover:bg-indigo-100 text-indigo-700 transition cursor-pointer"
+                title="Copy code"
+              >
+                {codeCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              </button>
+              {codeCopied && <span className="text-[11px] font-semibold text-emerald-700">Copied!</span>}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              This code is unique to your application and can only be used once. Use it on the Atesta platform to access your funded
+              course.
+            </p>
           </div>
-        )}
-
-        <ol className="text-xs text-slate-600 space-y-1.5 list-decimal list-inside">
-          <li>Use your access code above on the Atesta platform to start your funded course.</li>
-          <li>Complete the course and sit the assessment/examination.</li>
-          <li>Once you receive your certificate, upload it above under "Atesta Training Certification."</li>
-          <li>On approval, your certification will be linked to your application automatically.</li>
-        </ol>
-      </div>
+        </div>
+      )}
+    </li>
+    <li>
+      Exams and the online screening interview are provided at a fee for the candidate to complete, because this is a certificate
+      that a candidate will own and can use to access several job positions.
+    </li>
+    <li>
+      Atesta Training Certification is only issued by the Atesta Certification Institute of International Job Programs, a recognized
+      body responsible for certifying candidates for international job placements.
+    </li>
+    <li>
+      When you finish all the tasks assigned within the package, the institution awards those who have passed a certificate bearing
+      their name, ID, and approval that they performed and passed the task.
+    </li>
+    <li>
+      Global Talent Plus always assigns our job applicants to obtain this certificate with the ID, because it confirms to us that we
+      do not need to run a separate interview with an applicant the certificate itself assures us the applicant has met the given
+      requirement, and our task remains to process the applicant and make sure they achieve their dream job.
+    </li>
+    <li>
+      Obtaining this certificate demonstrates to potential employers abroad that you have undergone the proper vetting and
+      qualification process expected of candidates seeking work opportunities outside the country.
+    </li>
+  </ol>
+</div>
     </div>
   );
 };
