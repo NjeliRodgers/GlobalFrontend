@@ -314,12 +314,7 @@ export const AppShell: React.FC = () => {
             />
           )}
 
-          {activeTab === 'pipeline' && (
-            <CandidatesDirectoryPage
-              initialJobId={selectedJob?.id}
-              initialJobTitle={selectedJob?.title}
-            />
-          )}
+          {activeTab === 'pipeline' && <PipelinePage initialJobId={selectedJob?.id} />}
 
           {activeTab === 'interviews' && <InterviewSchedulerPage />}
 
