@@ -197,11 +197,22 @@ export interface ApexExam {
   interviewPassMarkPercent?: number | null;
 }
 
+export interface ApexModuleQuizQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+}
+
 export interface ApexCourseModule {
   id: string;
   courseId: string;
   title: string;
   contentType: 'text' | 'video' | 'quiz';
+  summary?: string | null;
+  externalLink?: string | null;
+  externalLinkLabel?: string | null;
+  quiz?: ApexModuleQuizQuestion[] | null;
   contentBody?: string | null;
   contentUrl?: string | null;
   documentUrl?: string | null;

@@ -23,6 +23,7 @@ import {
   deleteApexCourse,
   saveApexCourseModule,
   deleteApexCourseModule,
+  generateModuleContentFromPdfApi,
   uploadApexCourseModuleDocument,
   uploadApexCourseDocument,
   getApexPackages,
@@ -52,7 +53,9 @@ import {
   Clock3,
   Eye,
   FileDown,
-  Download
+  Download,
+  Link2,
+  HelpCircle
 } from 'lucide-react';
 
 type Tab = 'exams' | 'courses' | 'packages' | 'interview_products' | 'questions' | 'financials' | 'certificates' | 'transcripts';
@@ -81,6 +84,9 @@ export const ApexRecruiterPage: React.FC = () => {
   const [editingCourse, setEditingCourse] = useState<ApexCourse | null>(null);
   const [managingModulesForCourse, setManagingModulesForCourse] = useState<ApexCourse | null>(null);
   const [editingModule, setEditingModule] = useState<ApexCourseModule | null>(null);
+  const [quizDraft, setQuizDraft] = useState({ question: '', options: ['', '', '', ''], correctIndex: 0 });
+  const [generatingAi, setGeneratingAi] = useState(false);
+  const [aiError, setAiError] = useState('');
   const [uploadingDocFor, setUploadingDocFor] = useState<string | null>(null);
   const [docUploadError, setDocUploadError] = useState('');
   const [uploadingCourseDoc, setUploadingCourseDoc] = useState(false);
@@ -200,6 +206,38 @@ export const ApexRecruiterPage: React.FC = () => {
     await saveApexCourseModule(editingModule);
     setEditingModule(null);
     loadData();
+  };
+
+  const handleGenerateFromPdf = async () => {
+    if (!editingModule?.documentUrl) return;
+    setGeneratingAi(true);
+    setAiError('');
+    try {
+      const generated = await generateModuleContentFromPdfApi(editingModule.documentUrl);
+      setEditingModule({
+        ...editingModule,
+        contentBody: generated.contentBody || editingModule.contentBody,
+        summary: generated.summary || editingModule.summary,
+        quiz: generated.quiz.length > 0 ? generated.quiz : editingModule.quiz
+      });
+    } catch (err: any) {
+      setAiError(err.message || 'Failed to generate content from this PDF');
+    } finally {
+      setGeneratingAi(false);
+    }
+  };
+
+  const handleAddQuizQuestion = () => {
+    if (!editingModule) return;
+    if (!quizDraft.question.trim() || quizDraft.options.some((o) => !o.trim())) return;
+    const newQuestion = { id: `q-${Date.now()}`, question: quizDraft.question, options: quizDraft.options, correctIndex: quizDraft.correctIndex };
+    setEditingModule({ ...editingModule, quiz: [...(editingModule.quiz || []), newQuestion] });
+    setQuizDraft({ question: '', options: ['', '', '', ''], correctIndex: 0 });
+  };
+
+  const handleRemoveQuizQuestion = (id: string) => {
+    if (!editingModule) return;
+    setEditingModule({ ...editingModule, quiz: (editingModule.quiz || []).filter((q) => q.id !== id) });
   };
 
   const handleUploadModuleDocument = async (moduleId: string, file: File) => {
@@ -982,6 +1020,10 @@ export const ApexRecruiterPage: React.FC = () => {
                     contentType: 'text',
                     contentBody: '',
                     contentUrl: '',
+                    summary: '',
+                    externalLink: '',
+                    externalLinkLabel: '',
+                    quiz: [],
                     orderIndex: (managingModulesForCourse.modules || []).length
                   })
                 }
@@ -1002,51 +1044,100 @@ export const ApexRecruiterPage: React.FC = () => {
                       className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
                     />
                   </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Order</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editingModule.orderIndex}
+                      onChange={(e) => setEditingModule({ ...editingModule, orderIndex: Number(e.target.value) })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Notes (supports many paragraphs)</label>
+                    <p className="text-[10px] text-slate-400 mb-1.5">
+                      Separate paragraphs with a blank line. To define the Table of Contents yourself, start a paragraph with{' '}
+                      <code className="text-indigo-300">## </code> followed by the subtitle — e.g.{' '}
+                      <code className="text-indigo-300">## Handling Difficult Guests</code>. Every line prefixed this way becomes a
+                      clickable entry in the candidate's Table of Contents.
+                    </p>
+                    <textarea
+                      value={editingModule.contentBody || ''}
+                      onChange={(e) => setEditingModule({ ...editingModule, contentBody: e.target.value })}
+                      rows={12}
+                      placeholder={'## First Subtitle\nWrite the paragraph for this subtitle here...\n\n## Second Subtitle\nMore notes here...'}
+                      className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                    />
+                    {(() => {
+                      const headings = (editingModule.contentBody || '')
+                        .split(/\n\s*\n/)
+                        .map((p) => p.trim())
+                        .filter((p) => p.startsWith('## '))
+                        .map((p) => p.replace(/^##\s*/, ''));
+                      return headings.length > 0 ? (
+                        <div className="mt-2 p-2.5 bg-slate-900 border border-slate-800 rounded-xl">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Table of Contents Preview</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {headings.map((h, i) => (
+                              <span key={i} className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[10px] text-indigo-300">
+                                {h}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-amber-500 mt-1.5">
+                          No subtitles detected yet — no Table of Contents will show for this module until you add at least one "## " line.
+                        </p>
+                      );
+                    })()}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Summary (2–5 paragraphs, shown after the notes)</label>
+                    <textarea
+                      value={editingModule.summary || ''}
+                      onChange={(e) => setEditingModule({ ...editingModule, summary: e.target.value })}
+                      rows={4}
+                      className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Video URL — optional</label>
+                    <input
+                      type="text"
+                      value={editingModule.contentUrl || ''}
+                      onChange={(e) => setEditingModule({ ...editingModule, contentUrl: e.target.value })}
+                      placeholder="YouTube or hosted video link"
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">Content Type</label>
-                      <select
-                        value={editingModule.contentType}
-                        onChange={(e) => setEditingModule({ ...editingModule, contentType: e.target.value as 'text' | 'video' | 'quiz' })}
+                      <label className="block text-xs font-bold text-slate-300 mb-1">External Link — optional</label>
+                      <input
+                        type="text"
+                        value={editingModule.externalLink || ''}
+                        onChange={(e) => setEditingModule({ ...editingModule, externalLink: e.target.value })}
+                        placeholder="https://..."
                         className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
-                      >
-                        <option value="text">Text</option>
-                        <option value="video">Video</option>
-                        <option value="quiz">Quiz</option>
-                      </select>
+                      />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">Order</label>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Link Label</label>
                       <input
-                        type="number"
-                        min={0}
-                        value={editingModule.orderIndex}
-                        onChange={(e) => setEditingModule({ ...editingModule, orderIndex: Number(e.target.value) })}
+                        type="text"
+                        value={editingModule.externalLinkLabel || ''}
+                        onChange={(e) => setEditingModule({ ...editingModule, externalLinkLabel: e.target.value })}
+                        placeholder="e.g. Watch on YouTube"
                         className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
                       />
                     </div>
                   </div>
-                  {editingModule.contentType === 'video' ? (
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">Video URL</label>
-                      <input
-                        type="text"
-                        value={editingModule.contentUrl || ''}
-                        onChange={(e) => setEditingModule({ ...editingModule, contentUrl: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
-                      />
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">Content</label>
-                      <textarea
-                        value={editingModule.contentBody || ''}
-                        onChange={(e) => setEditingModule({ ...editingModule, contentBody: e.target.value })}
-                        rows={3}
-                        className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
-                      />
-                    </div>
-                  )}
 
                   <div className="border-t border-slate-800 pt-3">
                     <label className="block text-xs font-bold text-slate-300 mb-1">
@@ -1085,6 +1176,73 @@ export const ApexRecruiterPage: React.FC = () => {
                       <p className="text-[10px] text-sky-400 mt-1">Uploading…</p>
                     )}
                     {docUploadError && <p className="text-[10px] text-rose-400 mt-1">{docUploadError}</p>}
+                    {editingModule.documentUrl && (
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          onClick={handleGenerateFromPdf}
+                          disabled={generatingAi}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-[11px] rounded-lg cursor-pointer"
+                        >
+                          {generatingAi ? 'Generating…' : '✨ Generate Notes, Summary & Quiz from this PDF'}
+                        </button>
+                        {aiError && <p className="text-[10px] text-rose-400 mt-1">{aiError}</p>}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-slate-800 pt-3">
+                    <label className="block text-xs font-bold text-slate-300 mb-2">Sample Questions (quiz shown after the summary)</label>
+
+                    {(editingModule.quiz || []).map((q) => (
+                      <div key={q.id} className="flex items-start justify-between gap-2 p-2.5 mb-2 rounded-xl border border-slate-800 bg-slate-900">
+                        <div className="text-[11px] text-slate-200">
+                          <p className="font-bold">{q.question}</p>
+                          <p className="text-slate-400 mt-0.5">Correct: {q.options[q.correctIndex]}</p>
+                        </div>
+                        <button type="button" onClick={() => handleRemoveQuizQuestion(q.id)} className="p-1 text-rose-400 hover:bg-rose-950 rounded-lg cursor-pointer shrink-0">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+
+                    <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
+                      <input
+                        type="text"
+                        value={quizDraft.question}
+                        onChange={(e) => setQuizDraft({ ...quizDraft, question: e.target.value })}
+                        placeholder="Question text"
+                        className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                      {quizDraft.options.map((opt, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="correctOption"
+                            checked={quizDraft.correctIndex === i}
+                            onChange={() => setQuizDraft({ ...quizDraft, correctIndex: i })}
+                          />
+                          <input
+                            type="text"
+                            value={opt}
+                            onChange={(e) => {
+                              const options = [...quizDraft.options];
+                              options[i] = e.target.value;
+                              setQuizDraft({ ...quizDraft, options });
+                            }}
+                            placeholder={`Option ${i + 1}`}
+                            className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white"
+                          />
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={handleAddQuizQuestion}
+                        className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white font-bold text-[11px] rounded-lg cursor-pointer"
+                      >
+                        + Add Question
+                      </button>
+                    </div>
                   </div>
 
                   <button
@@ -1106,8 +1264,11 @@ export const ApexRecruiterPage: React.FC = () => {
                   .map((m) => (
                     <div key={m.id} className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 bg-slate-950">
                       <span className="text-xs flex items-center gap-1.5">
-                        {m.orderIndex + 1}. {m.title} <span className="text-slate-500">({m.contentType})</span>
+                        {m.orderIndex + 1}. {m.title}
                         {m.documentUrl && <FileText className="h-3 w-3 text-sky-400"><title>Has PDF</title></FileText>}
+                        {m.contentUrl && <Video className="h-3 w-3 text-purple-400"><title>Has video</title></Video>}
+                        {m.externalLink && <Link2 className="h-3 w-3 text-emerald-400"><title>Has external link</title></Link2>}
+                        {m.quiz && m.quiz.length > 0 && <HelpCircle className="h-3 w-3 text-amber-400"><title>{m.quiz.length} quiz question(s)</title></HelpCircle>}
                       </span>
                       <div className="flex items-center gap-2">
                         <button onClick={() => setEditingModule(m)} className="p-1.5 text-indigo-400 hover:bg-indigo-950 rounded-lg cursor-pointer">

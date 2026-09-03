@@ -1,4 +1,4 @@
-import { ApexQuestion, ApexExam, ApexInterviewProduct, ApexCourse, ApexCourseModule, ApexPackage, PaystackPayment, AiInterviewSession, ApexCertificate } from '../types';
+import { ApexQuestion, ApexExam, ApexInterviewProduct, ApexCourse, ApexCourseModule, ApexModuleQuizQuestion, ApexPackage, PaystackPayment, AiInterviewSession, ApexCertificate } from '../types';
 import { apiFetch, jsonHeaders } from './client';
 
 // Exams
@@ -47,6 +47,19 @@ export const deleteApexCourse = async (id: string): Promise<boolean> => {
   const res = await apiFetch(`/apex/courses/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete course');
   return true;
+};
+
+export const generateModuleContentFromPdfApi = async (
+  documentUrl: string
+): Promise<{ contentBody: string; summary: string; quiz: ApexModuleQuizQuestion[] }> => {
+  const res = await apiFetch('/apex/courses/modules/generate-from-pdf', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify({ documentUrl })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to generate content from this PDF');
+  return data.generated;
 };
 
 export const saveApexCourseModule = async (module: ApexCourseModule): Promise<ApexCourseModule> => {
