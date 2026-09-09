@@ -5,6 +5,7 @@ import {
   CandidatesDirectoryAnalytics,
   CandidatesDirectoryFilters
 } from '../api/usersApi';
+import { sendApplicationAccessCodeEmail } from '../api/applicationsApi';
 import {
   Search,
   Users,
@@ -86,6 +87,8 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedActionId, setSelectedActionId] = useState<string>('all');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [sendingCodeEmailForAppId, setSendingCodeEmailForAppId] = useState<string | null>(null);
+  const [codeEmailStatusByAppId, setCodeEmailStatusByAppId] = useState<Record<string, { ok: boolean; message: string }>>({});
 
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -170,6 +173,53 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     await navigator.clipboard.writeText(code);
     setCopiedCode(code);
     window.setTimeout(() => setCopiedCode(null), 1800);
+  };
+
+  const handleSendCodeEmail = async (applicationId: string, candidateEmail: string) => {
+    setSendingCodeEmailForAppId(applicationId);
+    setCodeEmailStatusByAppId((prev) => {
+      const next = { ...prev };
+      delete next[applicationId];
+      return next;
+    });
+
+    try {
+      const result = await sendApplicationAccessCodeEmail(applicationId);
+      setCodeEmailStatusByAppId((prev) => ({
+        ...prev,
+        [applicationId]: {
+          ok: result.delivered,
+          message: result.delivered
+            ? `Access-code email sent to ${candidateEmail}.`
+            : `Send attempted but delivery was not confirmed for ${candidateEmail}.`
+        }
+      }));
+      await loadData({
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
+        atestaStatus,
+        salesStage: salesStageFilter === 'any' ? undefined : salesStageFilter,
+        hasPayments: hasPaymentsBoolean(hasPayments),
+        hasApplications: hasPaymentsBoolean(hasApplications),
+        platformActive: hasPaymentsBoolean(platformActive),
+        minApplications: minApplications ? Number(minApplications) : undefined,
+        maxApplications: maxApplications ? Number(maxApplications) : undefined,
+        minTotalPaidKsh: minTotalPaidKsh ? Number(minTotalPaidKsh) : undefined,
+        sortBy,
+        sortOrder,
+        search: search || undefined
+      });
+    } catch (error: any) {
+      setCodeEmailStatusByAppId((prev) => ({
+        ...prev,
+        [applicationId]: {
+          ok: false,
+          message: error?.message || 'Failed to send access-code email.'
+        }
+      }));
+    } finally {
+      setSendingCodeEmailForAppId(null);
+    }
   };
 
   const filtered = useMemo(() => {
@@ -737,6 +787,29 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                                         ) : (
                                           <div className="text-[10px] text-amber-700">No course access code generated for this application.</div>
                                         )}
+                                        <div className="pt-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => void handleSendCodeEmail(app.applicationId, row.email)}
+                                            disabled={sendingCodeEmailForAppId === app.applicationId}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[10px] font-bold"
+                                          >
+                                            {sendingCodeEmailForAppId === app.applicationId
+                                              ? 'Sending Access Email...'
+                                              : 'Send Access Code Email'}
+                                          </button>
+                                          {codeEmailStatusByAppId[app.applicationId] && (
+                                            <p
+                                              className={`mt-1 text-[10px] ${
+                                                codeEmailStatusByAppId[app.applicationId].ok
+                                                  ? 'text-emerald-700'
+                                                  : 'text-rose-700'
+                                              }`}
+                                            >
+                                              {codeEmailStatusByAppId[app.applicationId].message}
+                                            </p>
+                                          )}
+                                        </div>
                                       </div>
                                     ))}
                                   </div>

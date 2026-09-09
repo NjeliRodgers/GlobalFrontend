@@ -15,7 +15,9 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, activeTab, setActiveTab, onOpenApplicationProgress }) => {
   const { user, role, isAuthenticated, logout, openAuthModal } = useAuth();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isApplicationMenuOpen, setIsApplicationMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const applicationsMenuRef = useRef<HTMLDivElement>(null);
 
   const isRecruiterOrAdmin = role === 'recruiter' || role === 'admin' || role === 'hiring_manager';
 
@@ -29,16 +31,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, activeTab, setA
     }
   }, [isAuthenticated, user?.id]);
 
-  const latestApplicationId = myApplications.length > 0
-    ? [...myApplications].sort(
-        (a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime()
-      )[0].id
-    : null;
+  const orderedApplications = [...myApplications].sort(
+    (a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime()
+  );
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsProfileMenuOpen(false);
+      }
+      if (applicationsMenuRef.current && !applicationsMenuRef.current.contains(event.target as Node)) {
+        setIsApplicationMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -109,18 +112,45 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, activeTab, setA
               </>
             )}
 
-            {latestApplicationId && (
-              <button
-                onClick={() => onOpenApplicationProgress(latestApplicationId)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
-                  activeTab === 'import_detail'
-                    ? 'bg-indigo-50 text-indigo-700'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                }`}
-              >
-                <ClipboardList className="h-3.5 w-3.5" />
-                Application Progress
-              </button>
+            {orderedApplications.length > 0 && (
+              <div className="relative" ref={applicationsMenuRef}>
+                <button
+                  onClick={() => setIsApplicationMenuOpen((prev) => !prev)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+                    activeTab === 'import_detail' || isApplicationMenuOpen
+                      ? 'bg-indigo-50 text-indigo-700'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  <ClipboardList className="h-3.5 w-3.5" />
+                  Application Progress
+                  <ChevronDown className={`h-3.5 w-3.5 transition ${isApplicationMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isApplicationMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50">
+                    <div className="px-3 pb-2 mb-1 border-b border-slate-100">
+                      <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">All My Applications</p>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto px-1">
+                      {orderedApplications.map((application) => (
+                        <button
+                          key={application.id}
+                          onClick={() => {
+                            onOpenApplicationProgress(application.id);
+                            setIsApplicationMenuOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-50 transition"
+                        >
+                          <div className="text-xs font-bold text-slate-900 truncate">{application.jobTitle}</div>
+                          <div className="text-[10px] text-slate-500">REF: {application.id}</div>
+                          <div className="text-[10px] text-slate-500">Applied: {new Date(application.appliedAt).toLocaleDateString()}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {role === 'candidate' && (
