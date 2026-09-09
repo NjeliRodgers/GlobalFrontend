@@ -380,27 +380,27 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase text-slate-500">Applications vs Accounts</span>
+            <span className="text-[11px] font-bold uppercase text-slate-500">Applied People vs Accounts</span>
             <BarChart3 className="h-4 w-4 text-indigo-600" />
           </div>
           <div className="text-2xl font-black text-indigo-700 mt-1">
             {periodAnalytics.funnelPercentages.applicationsVsTotalAccounts}%
           </div>
           <p className="text-[10px] text-slate-500 mt-0.5">
-            {periodAnalytics.totals.totalApplicationsAllTime} applications / {periodAnalytics.totals.totalCandidateAccounts} accounts
+            {periodAnalytics.totals.totalApplicationsAllTime} applied people / {periodAnalytics.totals.totalCandidateAccounts} accounts
           </p>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase text-slate-500">Atesta Creation vs Applications</span>
+            <span className="text-[11px] font-bold uppercase text-slate-500">Atesta Creation vs Applied People</span>
             <Target className="h-4 w-4 text-emerald-600" />
           </div>
           <div className="text-2xl font-black text-emerald-700 mt-1">
             {periodAnalytics.funnelPercentages.atestaAccountsVsApplications}%
           </div>
           <p className="text-[10px] text-slate-500 mt-0.5">
-            {periodAnalytics.totals.totalAtestaAccounts} Atesta / {periodAnalytics.totals.totalApplicationsAllTime} applications
+            {periodAnalytics.totals.totalAtestaAccounts} Atesta / {periodAnalytics.totals.totalApplicationsAllTime} applied people
           </p>
         </div>
 

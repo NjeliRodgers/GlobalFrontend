@@ -139,6 +139,7 @@ export interface CandidatesDirectoryAnalytics {
   registrationsInPeriod: number;
   atestaRegistrationsInPeriod: number;
   applicationsInPeriod: number;
+  applicationRecordsInPeriod?: number;
   paidCandidatesInPeriod: number;
   paymentTransactionsInPeriod: number;
   totalCashCollectedKsh: number;
@@ -151,6 +152,8 @@ export interface CandidatesDirectoryAnalytics {
   totals: {
     totalCandidateAccounts: number;
     totalApplicationsAllTime: number;
+    totalAppliedPeopleAllTime?: number;
+    totalApplicationRecordsAllTime?: number;
     totalAtestaAccounts: number;
     paidAtestaCandidatesAllTime: number;
     filteredCandidates: number;
@@ -215,6 +218,7 @@ const EMPTY_ANALYTICS: CandidatesDirectoryAnalytics = {
   registrationsInPeriod: 0,
   atestaRegistrationsInPeriod: 0,
   applicationsInPeriod: 0,
+  applicationRecordsInPeriod: 0,
   paidCandidatesInPeriod: 0,
   paymentTransactionsInPeriod: 0,
   totalCashCollectedKsh: 0,
@@ -224,6 +228,8 @@ const EMPTY_ANALYTICS: CandidatesDirectoryAnalytics = {
   totals: {
     totalCandidateAccounts: 0,
     totalApplicationsAllTime: 0,
+    totalAppliedPeopleAllTime: 0,
+    totalApplicationRecordsAllTime: 0,
     totalAtestaAccounts: 0,
     paidAtestaCandidatesAllTime: 0,
     filteredCandidates: 0,
