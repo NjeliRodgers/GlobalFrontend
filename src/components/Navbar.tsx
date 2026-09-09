@@ -104,17 +104,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, activeTab, setA
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                   }`}
                 >
-                  Recruiter Portal
-                </button>
-                <button
-                  onClick={() => setActiveTab('pipeline')}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
-                    activeTab === 'pipeline'
-                      ? 'bg-indigo-50 text-indigo-700'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  Hiring Pipeline
+                  Create Jobs
                 </button>
               </>
             )}

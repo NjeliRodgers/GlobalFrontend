@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Job, Application } from '../types';
-import { fetchJobs, createJob, updateJob } from '../api/jobsApi';
+import { fetchJobs, createJob, updateJob, deleteJob } from '../api/jobsApi';
 import { fetchApplications } from '../api/applicationsApi';
 import { getApexPackages } from '../api/apexAssessmentApi';
 import { RichTextEditor } from '../components/RichTextEditor';
@@ -9,6 +9,7 @@ import {
   Briefcase,
   TrendingUp,
   Award,
+  Search,
   Plus,
   X,
   MapPin,
@@ -17,7 +18,8 @@ import {
   Filter,
   Layers,
   Sparkles,
-  Pencil
+  Pencil,
+  Trash2
 } from 'lucide-react';
 
 interface RecruiterDashboardPageProps {
@@ -48,6 +50,7 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
   const [packagePickerValue, setPackagePickerValue] = useState('');
   const [newJobError, setNewJobError] = useState('');
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
+  const [jobSearchQuery, setJobSearchQuery] = useState('');
 
   useEffect(() => {
     loadDashboardData();
@@ -148,6 +151,20 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
     }
   };
 
+  const handleDeleteJob = async (job: Job) => {
+    const confirmed = window.confirm(
+      `Delete job "${job.title}"? This removes the posting from the system.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteJob(job.id);
+      await loadDashboardData();
+    } catch (err: any) {
+      window.alert(err.message || 'Failed to delete this job.');
+    }
+  };
+
   // Metrics Calculations
   const totalOpenings = jobs.filter((j) => j.status === 'active').length;
   const totalApplications = applications.length;
@@ -155,6 +172,19 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
   const interviewScheduledCount = applications.filter(
     (a) => a.stage === 'Technical Interview' || a.stage === 'Final Interview'
   ).length;
+  const filteredJobs = jobs.filter((job) => {
+    const query = jobSearchQuery.trim().toLowerCase();
+    if (!query) return true;
+
+    return (
+      job.title.toLowerCase().includes(query) ||
+      job.department.toLowerCase().includes(query) ||
+      job.location.toLowerCase().includes(query) ||
+      job.workType.toLowerCase().includes(query) ||
+      job.salaryRange.toLowerCase().includes(query) ||
+      job.id.toLowerCase().includes(query)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -243,9 +273,20 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
 
       {/* Posted Job Openings Table with Application Counts */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            value={jobSearchQuery}
+            onChange={(e) => setJobSearchQuery(e.target.value)}
+            placeholder="Search job title, department, location, type, or ref..."
+            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
-            <h2 className="text-base font-extrabold text-slate-900">All Posted Job Openings</h2>
+            <h2 className="text-base font-extrabold text-slate-900">All Posted Job Openings ({filteredJobs.length})</h2>
             <p className="text-xs text-slate-500">View application counts and jump directly into candidate stage pipelines</p>
           </div>
 
@@ -274,7 +315,7 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {jobs.map((job) => (
+                {filteredJobs.map((job) => (
                   <tr key={job.id} className="hover:bg-slate-50/80 transition">
                     <td className="p-3">
                       <span className="font-extrabold text-slate-900 text-sm block">{job.title}</span>
@@ -301,6 +342,13 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
                         >
                           <Pencil className="h-3 w-3" />
                           Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteJob(job)}
+                          className="px-3 py-1.5 bg-white border border-rose-200 hover:bg-rose-50 text-rose-700 font-bold text-[11px] rounded-lg transition cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Delete
                         </button>
                         <button
                           onClick={() => onNavigateToPipeline(job.id)}

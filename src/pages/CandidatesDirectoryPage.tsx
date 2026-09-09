@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { fetchCandidatesDirectory, CandidateDirectoryRow } from '../api/usersApi';
+import {
+  fetchCandidatesDirectoryReport,
+  CandidateDirectoryRow,
+  CandidatesDirectoryAnalytics
+} from '../api/usersApi';
 import { Search, Users, ChevronDown, ChevronUp, ShieldCheck, FolderOpen, BarChart3, Clock3 } from 'lucide-react';
 
 interface CandidatesDirectoryPageProps {
@@ -7,26 +11,64 @@ interface CandidatesDirectoryPageProps {
   initialJobTitle?: string;
 }
 
+const EMPTY_ANALYTICS: CandidatesDirectoryAnalytics = {
+  fromDate: null,
+  toDate: null,
+  registrationsInPeriod: 0,
+  atestaRegistrationsInPeriod: 0,
+  applicationsInPeriod: 0,
+  paidCandidatesInPeriod: 0,
+  paymentTransactionsInPeriod: 0,
+  totalCashCollectedKsh: 0,
+  firstPaymentAt: null,
+  lastPaymentAt: null,
+  dailyCollections: []
+};
+
 export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = ({
   initialJobId,
   initialJobTitle
 }) => {
   const [rows, setRows] = useState<CandidateDirectoryRow[]>([]);
+  const [periodAnalytics, setPeriodAnalytics] = useState<CandidatesDirectoryAnalytics>(EMPTY_ANALYTICS);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [applicationsOnly, setApplicationsOnly] = useState(false);
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, []);
 
-  const loadData = async () => {
+  const loadData = async (filters?: { fromDate?: string; toDate?: string }) => {
     setLoading(true);
-    const data = await fetchCandidatesDirectory();
-    setRows(data);
+    const data = await fetchCandidatesDirectoryReport(filters);
+    setRows(data.candidates);
+    setPeriodAnalytics(data.analytics || EMPTY_ANALYTICS);
     setLoading(false);
   };
+
+  const applyDateFilter = async () => {
+    await loadData({
+      fromDate: fromDate || undefined,
+      toDate: toDate || undefined
+    });
+  };
+
+  const clearDateFilter = async () => {
+    setFromDate('');
+    setToDate('');
+    await loadData();
+  };
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('en-KE', {
+      style: 'currency',
+      currency: 'KES',
+      maximumFractionDigits: 0
+    }).format(value || 0);
 
   const scopedRows = useMemo(() => {
     if (!initialJobId) return rows;
@@ -129,6 +171,110 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
             {applicationsOnly ? 'Showing: Applied Only' : 'Filter: Applied Only'}
           </button>
         </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">From Date</label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">To Date</label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <button
+            onClick={applyDateFilter}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl"
+          >
+            Apply Date Filter
+          </button>
+          <button
+            onClick={clearDateFilter}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+          >
+            Clear Filter
+          </button>
+        </div>
+        <p className="text-[11px] text-slate-500">
+          Date filter applies to registrations, applications, and payment analytics. Leave blank for all-time totals.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-slate-500">Paid Candidates</span>
+            <BarChart3 className="h-4 w-4 text-emerald-600" />
+          </div>
+          <div className="text-2xl font-black text-emerald-700 mt-1">{periodAnalytics.paidCandidatesInPeriod}</div>
+          <p className="text-[10px] text-slate-500 mt-0.5">Candidates who paid any amount</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-slate-500">Total Collected</span>
+            <Clock3 className="h-4 w-4 text-indigo-600" />
+          </div>
+          <div className="text-2xl font-black text-indigo-700 mt-1">{formatCurrency(periodAnalytics.totalCashCollectedKsh)}</div>
+          <p className="text-[10px] text-slate-500 mt-0.5">Approved payments in selected period</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-slate-500">Payment Transactions</span>
+            <ShieldCheck className="h-4 w-4 text-amber-600" />
+          </div>
+          <div className="text-2xl font-black text-amber-700 mt-1">{periodAnalytics.paymentTransactionsInPeriod}</div>
+          <p className="text-[10px] text-slate-500 mt-0.5">
+            First: {periodAnalytics.firstPaymentAt ? new Date(periodAnalytics.firstPaymentAt).toLocaleDateString() : 'N/A'}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-slate-500">Registrations</span>
+            <Users className="h-4 w-4 text-sky-600" />
+          </div>
+          <div className="text-2xl font-black text-sky-700 mt-1">{periodAnalytics.registrationsInPeriod}</div>
+          <p className="text-[10px] text-slate-500 mt-0.5">Atesta registrations: {periodAnalytics.atestaRegistrationsInPeriod}</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+        <h3 className="text-sm font-extrabold text-slate-900 mb-2">Daily Collections</h3>
+        {periodAnalytics.dailyCollections.length === 0 ? (
+          <p className="text-xs text-slate-500">No payments found for this period.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[10px]">
+                  <th className="p-2">Date</th>
+                  <th className="p-2">Collected Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {periodAnalytics.dailyCollections.map((day) => (
+                  <tr key={day.date}>
+                    <td className="p-2 text-slate-700">{new Date(day.date).toLocaleDateString()}</td>
+                    <td className="p-2 font-bold text-emerald-700">{formatCurrency(day.amountKsh)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">

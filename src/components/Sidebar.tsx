@@ -24,9 +24,8 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { tab: 'job_board', label: 'Public Job Openings', icon: Globe, iconColor: 'text-slate-300' },
-  { tab: 'recruiter_dashboard', label: 'Recruiter Dashboard', icon: Briefcase, iconColor: 'text-[#5b8bb5]' },
-  { tab: 'pipeline', label: 'Candidate Hiring Pipeline', icon: Layers, iconColor: 'text-[#5b8bb5]' },
-  { tab: 'candidates_directory', label: 'Candidates Directory & Analytics', icon: Users, iconColor: 'text-indigo-400' },
+  { tab: 'recruiter_dashboard', label: 'Create Jobs & Dashboard', icon: Briefcase, iconColor: 'text-[#5b8bb5]' },
+  { tab: 'candidates_directory', label: 'Candidates', icon: Users, iconColor: 'text-indigo-400' },
   { tab: 'interviews', label: 'Interview Scheduling Center', icon: Calendar, iconColor: 'text-emerald-400' },
   { tab: 'email_logs', label: ' Email Logs and Archive', icon: Mail, iconColor: 'text-amber-400' },
   { tab: 'document_vault', label: ' Document storage Vault', icon: FolderLock, iconColor: 'text-sky-400' },

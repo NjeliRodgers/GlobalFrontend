@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { fetchUsers, createUser } from '../api/usersApi';
 import { useAuth } from '../auth/AuthContext';
-import { ShieldCheck, Users, Check, X, KeyRound, UserPlus, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { ShieldCheck, Users, Check, X, KeyRound, UserPlus, CheckCircle2, Eye, EyeOff, Search } from 'lucide-react';
 import { isValidEmail, EMAIL_ERROR_MESSAGE } from '../utils/validators';
 
 export const TeamRbacPage: React.FC = () => {
@@ -20,14 +20,25 @@ export const TeamRbacPage: React.FC = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [addSuccessMsg, setAddSuccessMsg] = useState('');
   const [formError, setFormError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const isPrimaryAdminOrRecruiter = role === 'admin' || role === 'recruiter';
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredUsers = users.filter((u) => {
+    if (!normalizedQuery) return true;
+    return (
+      u.name.toLowerCase().includes(normalizedQuery) ||
+      u.email.toLowerCase().includes(normalizedQuery) ||
+      u.role.toLowerCase().includes(normalizedQuery) ||
+      (u.department || '').toLowerCase().includes(normalizedQuery)
+    );
+  });
   const roleOrder: UserRole[] = ['admin', 'recruiter', 'hiring_manager', 'interviewer'];
   const roleCounts = roleOrder.reduce<Record<UserRole, number>>((acc, roleKey) => {
-    acc[roleKey] = users.filter((u) => u.role === roleKey).length;
+    acc[roleKey] = filteredUsers.filter((u) => u.role === roleKey).length;
     return acc;
   }, {} as Record<UserRole, number>);
-  const candidateCount = users.filter((u) => u.role === 'candidate').length;
+  const candidateCount = filteredUsers.filter((u) => u.role === 'candidate').length;
 
   useEffect(() => {
     loadUsers();
@@ -97,6 +108,19 @@ export const TeamRbacPage: React.FC = () => {
           <span>{addSuccessMsg}</span>
         </div>
       )}
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs max-w-xl">
+        <div className="relative">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search team member, email, role, or department..."
+            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
         {roleOrder.map((roleKey) => {
@@ -205,7 +229,7 @@ export const TeamRbacPage: React.FC = () => {
         ) : (
           <div className="space-y-5">
             {(['admin', 'recruiter', 'hiring_manager', 'interviewer'] as UserRole[]).map((roleKey) => {
-              const roleUsers = users.filter((u) => u.role === roleKey);
+              const roleUsers = filteredUsers.filter((u) => u.role === roleKey);
               if (roleUsers.length === 0) return null;
               const roleLabel = roleKey.replace('_', ' ');
               return (
@@ -229,9 +253,9 @@ export const TeamRbacPage: React.FC = () => {
                 </div>
               );
             })}
-            {users.filter((u) => u.role === 'candidate').length > 0 && (
+            {filteredUsers.filter((u) => u.role === 'candidate').length > 0 && (
               <p className="text-[11px] text-slate-400 pt-2 border-t border-slate-100">
-                {users.filter((u) => u.role === 'candidate').length} candidate account(s) not shown here — this page covers team access only.
+                {filteredUsers.filter((u) => u.role === 'candidate').length} candidate account(s) not shown here — this page covers team access only.
               </p>
             )}
           </div>

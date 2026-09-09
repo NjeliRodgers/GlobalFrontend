@@ -46,3 +46,12 @@ export async function updateJob(id: string, updates: Partial<Job>): Promise<Job>
   if (!res.ok) throw new Error(data.error || 'Failed to update job');
   return data.job;
 }
+
+export async function deleteJob(id: string): Promise<void> {
+  const res = await apiFetch(`/jobs/${id}`, {
+    method: 'DELETE',
+    headers: jsonHeaders
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to delete job');
+}

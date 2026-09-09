@@ -103,7 +103,8 @@ export const ApexRecruiterPage: React.FC = () => {
 
   // Questions
   const [questions, setQuestions] = useState<ApexQuestion[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [tabSearchQuery, setTabSearchQuery] = useState('');
+  const [questionSearchQuery, setQuestionSearchQuery] = useState('');
   const [editingQuestion, setEditingQuestion] = useState<ApexQuestion | null>(null);
   const [isNewQuestion, setIsNewQuestion] = useState(false);
   const [uploadingCsv, setUploadingCsv] = useState(false);
@@ -333,10 +334,93 @@ export const ApexRecruiterPage: React.FC = () => {
   };
 
   // ── Questions ──
+  const normalizedTabSearch = tabSearchQuery.trim().toLowerCase();
+  const normalizedQuestionSearch = questionSearchQuery.trim().toLowerCase();
+
+  const filteredExams = exams.filter((ex) => {
+    if (!normalizedTabSearch) return true;
+    return (
+      ex.name.toLowerCase().includes(normalizedTabSearch) ||
+      ex.jobTitle.toLowerCase().includes(normalizedTabSearch) ||
+      (ex.category || '').toLowerCase().includes(normalizedTabSearch) ||
+      (ex.description || '').toLowerCase().includes(normalizedTabSearch)
+    );
+  });
+
+  const filteredCourses = courses.filter((course) => {
+    if (!normalizedTabSearch) return true;
+    const moduleMatches = (course.modules || []).some((module) =>
+      module.title.toLowerCase().includes(normalizedTabSearch)
+    );
+    return (
+      course.name.toLowerCase().includes(normalizedTabSearch) ||
+      (course.category || '').toLowerCase().includes(normalizedTabSearch) ||
+      (course.description || '').toLowerCase().includes(normalizedTabSearch) ||
+      moduleMatches
+    );
+  });
+
+  const filteredPackages = packages.filter((pkg) => {
+    if (!normalizedTabSearch) return true;
+    return (
+      pkg.name.toLowerCase().includes(normalizedTabSearch) ||
+      (pkg.packageId || '').toLowerCase().includes(normalizedTabSearch) ||
+      (pkg.category || '').toLowerCase().includes(normalizedTabSearch) ||
+      (pkg.description || '').toLowerCase().includes(normalizedTabSearch)
+    );
+  });
+
+  const filteredProducts = products.filter((product) => {
+    if (!normalizedTabSearch) return true;
+    return (
+      product.name.toLowerCase().includes(normalizedTabSearch) ||
+      product.jobTitle.toLowerCase().includes(normalizedTabSearch) ||
+      (product.description || '').toLowerCase().includes(normalizedTabSearch)
+    );
+  });
+
+  const filteredPayments = payments.filter((payment) => {
+    if (!normalizedTabSearch) return true;
+    return (
+      payment.transactionRef.toLowerCase().includes(normalizedTabSearch) ||
+      payment.candidateName.toLowerCase().includes(normalizedTabSearch) ||
+      payment.candidateEmail.toLowerCase().includes(normalizedTabSearch) ||
+      payment.provider.toLowerCase().includes(normalizedTabSearch) ||
+      payment.stage.toLowerCase().includes(normalizedTabSearch)
+    );
+  });
+
+  const filteredCertificates = certificates.filter((cert) => {
+    if (!normalizedTabSearch) return true;
+    return (
+      cert.candidateName.toLowerCase().includes(normalizedTabSearch) ||
+      cert.sourceName.toLowerCase().includes(normalizedTabSearch) ||
+      cert.sourceType.toLowerCase().includes(normalizedTabSearch) ||
+      cert.verificationCode.toLowerCase().includes(normalizedTabSearch) ||
+      cert.status.toLowerCase().includes(normalizedTabSearch)
+    );
+  });
+
+  const filteredAiSessions = aiSessions.filter((session) => {
+    if (!normalizedTabSearch) return true;
+    const transcriptMatches = (session.transcript || []).some(
+      (line) =>
+        line.speaker.toLowerCase().includes(normalizedTabSearch) ||
+        line.message.toLowerCase().includes(normalizedTabSearch)
+    );
+    return (
+      session.candidateName.toLowerCase().includes(normalizedTabSearch) ||
+      session.candidateEmail.toLowerCase().includes(normalizedTabSearch) ||
+      transcriptMatches
+    );
+  });
+
+  const combinedQuestionQuery = [normalizedTabSearch, normalizedQuestionSearch].filter(Boolean).join(' ').trim();
   const filteredQuestions = questions.filter(
     (q) =>
-      q.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (exams.find((ex) => ex.id === q.examId)?.name || '').toLowerCase().includes(searchQuery.toLowerCase())
+      !combinedQuestionQuery ||
+      q.question.toLowerCase().includes(combinedQuestionQuery) ||
+      (exams.find((ex) => ex.id === q.examId)?.name || '').toLowerCase().includes(combinedQuestionQuery)
   );
 
   const handleSaveQuestion = async (e: React.FormEvent) => {
@@ -511,6 +595,19 @@ export const ApexRecruiterPage: React.FC = () => {
           <Users className="h-4 w-4 text-amber-400" />
           <span>AI Transcripts ({aiSessions.length})</span>
         </button>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+        <div className="relative max-w-lg">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            value={tabSearchQuery}
+            onChange={(e) => setTabSearchQuery(e.target.value)}
+            placeholder="Search current tab by name, title, candidate, source, or reference..."
+            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
       </div>
 
       {/* Tab: Exams & Pricing */}
@@ -712,8 +809,8 @@ export const ApexRecruiterPage: React.FC = () => {
           )}
 
           <div className="space-y-3">
-            {exams.length === 0 && <p className="text-center py-8 text-slate-400 text-xs">No exams created yet.</p>}
-            {exams.map((ex) => (
+            {filteredExams.length === 0 && <p className="text-center py-8 text-slate-400 text-xs">No exams matched your search.</p>}
+            {filteredExams.map((ex) => (
               <div
                 key={ex.id}
                 className="p-4 bg-slate-50 rounded-2xl border border-slate-200 hover:border-emerald-300 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
@@ -964,8 +1061,8 @@ export const ApexRecruiterPage: React.FC = () => {
           )}
 
           <div className="space-y-3">
-            {courses.length === 0 && <p className="text-center py-8 text-slate-400 text-xs">No courses created yet.</p>}
-            {courses.map((c) => (
+            {filteredCourses.length === 0 && <p className="text-center py-8 text-slate-400 text-xs">No courses matched your search.</p>}
+            {filteredCourses.map((c) => (
               <div
                 key={c.id}
                 className="p-4 bg-slate-50 rounded-2xl border border-slate-200 hover:border-sky-300 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
@@ -1503,8 +1600,8 @@ export const ApexRecruiterPage: React.FC = () => {
           )}
 
           <div className="space-y-3">
-            {packages.length === 0 && <p className="text-center py-8 text-slate-400 text-xs">No packages created yet.</p>}
-            {packages.map((p) => {
+            {filteredPackages.length === 0 && <p className="text-center py-8 text-slate-400 text-xs">No packages matched your search.</p>}
+            {filteredPackages.map((p) => {
               const pExamIds: string[] = Array.isArray(p.examIds) && p.examIds.length > 0 ? p.examIds : p.examId ? [p.examId] : [];
               const pCourseIds: string[] = Array.isArray(p.courseIds) && p.courseIds.length > 0 ? p.courseIds : p.courseId ? [p.courseId] : [];
               return (
@@ -1635,8 +1732,8 @@ export const ApexRecruiterPage: React.FC = () => {
           )}
 
           <div className="space-y-3">
-            {products.length === 0 && <p className="text-center py-8 text-slate-400 text-xs">No AI interview packages created yet.</p>}
-            {products.map((p) => (
+            {filteredProducts.length === 0 && <p className="text-center py-8 text-slate-400 text-xs">No AI interview packages matched your search.</p>}
+            {filteredProducts.map((p) => (
               <div
                 key={p.id}
                 className="p-4 bg-slate-50 rounded-2xl border border-slate-200 hover:border-purple-300 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
@@ -1673,8 +1770,8 @@ export const ApexRecruiterPage: React.FC = () => {
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
               <input
                 type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={questionSearchQuery}
+                onChange={(e) => setQuestionSearchQuery(e.target.value)}
                 placeholder="Search questions or exam name..."
                 className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
@@ -1893,14 +1990,14 @@ export const ApexRecruiterPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {payments.length === 0 ? (
+                {filteredPayments.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="p-6 text-center text-slate-400 text-xs">
-                      No Paystack candidate payments recorded yet.
+                      No Paystack candidate payments matched your search.
                     </td>
                   </tr>
                 ) : (
-                  payments.map((p) => (
+                  filteredPayments.map((p) => (
                     <tr key={p.id} className="hover:bg-slate-50">
                       <td className="p-3 font-mono font-bold text-slate-900">{p.transactionRef}</td>
                       <td className="p-3">
@@ -1984,14 +2081,14 @@ export const ApexRecruiterPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {certificates.length === 0 ? (
+                {filteredCertificates.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="p-6 text-center text-slate-400 text-xs">
-                      No certificates issued yet.
+                      No certificates matched your search.
                     </td>
                   </tr>
                 ) : (
-                  certificates.map((c) => (
+                  filteredCertificates.map((c) => (
                     <tr key={c.id} className="hover:bg-slate-50">
                       <td className="p-3 font-bold text-slate-900">{c.candidateName}</td>
                       <td className="p-3">
@@ -2062,10 +2159,10 @@ export const ApexRecruiterPage: React.FC = () => {
           </div>
 
           <div className="space-y-4">
-            {aiSessions.length === 0 ? (
-              <p className="text-center py-8 text-slate-400 text-xs">No completed AI Interview sessions found yet.</p>
+            {filteredAiSessions.length === 0 ? (
+              <p className="text-center py-8 text-slate-400 text-xs">No completed AI Interview sessions matched your search.</p>
             ) : (
-              aiSessions.map((sess) => (
+              filteredAiSessions.map((sess) => (
                 <div key={sess.id} className="p-5 bg-slate-900 text-white rounded-2xl space-y-3">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                     <div>

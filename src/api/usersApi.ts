@@ -121,17 +121,69 @@ export interface CandidateDirectoryRow {
     lastUpdated: string;
     documentsCount: number;
   }>;
+  totalPaidKsh?: number;
+  paidTransactionsCount?: number;
+  lastPaymentAt?: string | null;
 }
 
-export async function fetchCandidatesDirectory(): Promise<CandidateDirectoryRow[]> {
+export interface CandidatesDirectoryAnalytics {
+  fromDate: string | null;
+  toDate: string | null;
+  registrationsInPeriod: number;
+  atestaRegistrationsInPeriod: number;
+  applicationsInPeriod: number;
+  paidCandidatesInPeriod: number;
+  paymentTransactionsInPeriod: number;
+  totalCashCollectedKsh: number;
+  firstPaymentAt: string | null;
+  lastPaymentAt: string | null;
+  dailyCollections: Array<{
+    date: string;
+    amountKsh: number;
+  }>;
+}
+
+export interface CandidatesDirectoryResponse {
+  candidates: CandidateDirectoryRow[];
+  analytics: CandidatesDirectoryAnalytics;
+}
+
+const EMPTY_ANALYTICS: CandidatesDirectoryAnalytics = {
+  fromDate: null,
+  toDate: null,
+  registrationsInPeriod: 0,
+  atestaRegistrationsInPeriod: 0,
+  applicationsInPeriod: 0,
+  paidCandidatesInPeriod: 0,
+  paymentTransactionsInPeriod: 0,
+  totalCashCollectedKsh: 0,
+  firstPaymentAt: null,
+  lastPaymentAt: null,
+  dailyCollections: []
+};
+
+export async function fetchCandidatesDirectoryReport(filters?: { fromDate?: string; toDate?: string }): Promise<CandidatesDirectoryResponse> {
   try {
-    const res = await apiFetch('/users/candidates/directory');
-    if (!res.ok) return [];
+    const params = new URLSearchParams();
+    if (filters?.fromDate) params.set('fromDate', filters.fromDate);
+    if (filters?.toDate) params.set('toDate', filters.toDate);
+
+    const query = params.toString();
+    const res = await apiFetch(`/users/candidates/directory${query ? `?${query}` : ''}`);
+    if (!res.ok) return { candidates: [], analytics: EMPTY_ANALYTICS };
     const data = await res.json();
-    return data.candidates || [];
+    return {
+      candidates: data.candidates || [],
+      analytics: data.analytics || EMPTY_ANALYTICS
+    };
   } catch (err) {
-    return [];
+    return { candidates: [], analytics: EMPTY_ANALYTICS };
   }
+}
+
+export async function fetchCandidatesDirectory(filters?: { fromDate?: string; toDate?: string }): Promise<CandidateDirectoryRow[]> {
+  const data = await fetchCandidatesDirectoryReport(filters);
+  return data.candidates;
 }
 export async function updateUserProfile(userId: string, updates: {
   name?: string;
