@@ -124,6 +124,13 @@ export interface CandidateDirectoryRow {
   totalPaidKsh?: number;
   paidTransactionsCount?: number;
   lastPaymentAt?: string | null;
+  periodPaidKsh?: number;
+  periodPaidTransactionsCount?: number;
+  periodLastPaymentAt?: string | null;
+  salesStage?: string;
+  actionTags?: string[];
+  daysSinceRegistration?: number;
+  daysSinceLastActivity?: number | null;
 }
 
 export interface CandidatesDirectoryAnalytics {
@@ -141,6 +148,60 @@ export interface CandidatesDirectoryAnalytics {
     date: string;
     amountKsh: number;
   }>;
+  totals: {
+    totalCandidateAccounts: number;
+    totalApplicationsAllTime: number;
+    totalAtestaAccounts: number;
+    paidAtestaCandidatesAllTime: number;
+    filteredCandidates: number;
+    filteredWithApplications: number;
+    filteredAtestaAccounts: number;
+    filteredPaidAtestaAccounts: number;
+  };
+  funnelPercentages: {
+    applicationsVsTotalAccounts: number;
+    atestaAccountsVsApplications: number;
+    paidAtestaUsersVsAtestaAccounts: number;
+    filteredApplicationsVsTotalAccounts: number;
+    filteredAtestaAccountsVsApplications: number;
+    filteredPaidAtestaUsersVsAtestaAccounts: number;
+  };
+  salesStageDistribution: Record<string, number>;
+  dropOff: {
+    registeredWithoutApplications: number;
+    appliedWithoutAtesta: number;
+    atestaWithoutPayment: number;
+  };
+  salesActions: Array<{
+    id: string;
+    label: string;
+    description: string;
+    count: number;
+    candidateIds: string[];
+  }>;
+  filtersApplied?: Record<string, unknown>;
+}
+
+export interface CandidatesDirectoryFilters {
+  fromDate?: string;
+  toDate?: string;
+  search?: string;
+  jobId?: string;
+  stage?: string;
+  stages?: string[];
+  atestaStatus?: 'any' | 'none' | 'created' | 'active' | 'inactive';
+  salesStage?: string;
+  hasApplications?: boolean;
+  hasPayments?: boolean;
+  hasAtesta?: boolean;
+  platformActive?: boolean;
+  minApplications?: number;
+  maxApplications?: number;
+  minTotalPaidKsh?: number;
+  maxTotalPaidKsh?: number;
+  sortBy?: 'registeredAt' | 'name' | 'totalApplications' | 'totalPaidKsh' | 'lastAppliedAt' | 'lastPaymentAt';
+  sortOrder?: 'asc' | 'desc';
+  limit?: number;
 }
 
 export interface CandidatesDirectoryResponse {
@@ -159,14 +220,56 @@ const EMPTY_ANALYTICS: CandidatesDirectoryAnalytics = {
   totalCashCollectedKsh: 0,
   firstPaymentAt: null,
   lastPaymentAt: null,
-  dailyCollections: []
+  dailyCollections: [],
+  totals: {
+    totalCandidateAccounts: 0,
+    totalApplicationsAllTime: 0,
+    totalAtestaAccounts: 0,
+    paidAtestaCandidatesAllTime: 0,
+    filteredCandidates: 0,
+    filteredWithApplications: 0,
+    filteredAtestaAccounts: 0,
+    filteredPaidAtestaAccounts: 0
+  },
+  funnelPercentages: {
+    applicationsVsTotalAccounts: 0,
+    atestaAccountsVsApplications: 0,
+    paidAtestaUsersVsAtestaAccounts: 0,
+    filteredApplicationsVsTotalAccounts: 0,
+    filteredAtestaAccountsVsApplications: 0,
+    filteredPaidAtestaUsersVsAtestaAccounts: 0
+  },
+  salesStageDistribution: {},
+  dropOff: {
+    registeredWithoutApplications: 0,
+    appliedWithoutAtesta: 0,
+    atestaWithoutPayment: 0
+  },
+  salesActions: []
 };
 
-export async function fetchCandidatesDirectoryReport(filters?: { fromDate?: string; toDate?: string }): Promise<CandidatesDirectoryResponse> {
+export async function fetchCandidatesDirectoryReport(filters?: CandidatesDirectoryFilters): Promise<CandidatesDirectoryResponse> {
   try {
     const params = new URLSearchParams();
     if (filters?.fromDate) params.set('fromDate', filters.fromDate);
     if (filters?.toDate) params.set('toDate', filters.toDate);
+    if (filters?.search) params.set('search', filters.search);
+    if (filters?.jobId) params.set('jobId', filters.jobId);
+    if (filters?.stage) params.set('stage', filters.stage);
+    if (filters?.stages?.length) params.set('stages', filters.stages.join(','));
+    if (filters?.atestaStatus) params.set('atestaStatus', filters.atestaStatus);
+    if (filters?.salesStage) params.set('salesStage', filters.salesStage);
+    if (typeof filters?.hasApplications === 'boolean') params.set('hasApplications', String(filters.hasApplications));
+    if (typeof filters?.hasPayments === 'boolean') params.set('hasPayments', String(filters.hasPayments));
+    if (typeof filters?.hasAtesta === 'boolean') params.set('hasAtesta', String(filters.hasAtesta));
+    if (typeof filters?.platformActive === 'boolean') params.set('platformActive', String(filters.platformActive));
+    if (typeof filters?.minApplications === 'number') params.set('minApplications', String(filters.minApplications));
+    if (typeof filters?.maxApplications === 'number') params.set('maxApplications', String(filters.maxApplications));
+    if (typeof filters?.minTotalPaidKsh === 'number') params.set('minTotalPaidKsh', String(filters.minTotalPaidKsh));
+    if (typeof filters?.maxTotalPaidKsh === 'number') params.set('maxTotalPaidKsh', String(filters.maxTotalPaidKsh));
+    if (filters?.sortBy) params.set('sortBy', filters.sortBy);
+    if (filters?.sortOrder) params.set('sortOrder', filters.sortOrder);
+    if (typeof filters?.limit === 'number') params.set('limit', String(filters.limit));
 
     const query = params.toString();
     const res = await apiFetch(`/users/candidates/directory${query ? `?${query}` : ''}`);
@@ -181,7 +284,7 @@ export async function fetchCandidatesDirectoryReport(filters?: { fromDate?: stri
   }
 }
 
-export async function fetchCandidatesDirectory(filters?: { fromDate?: string; toDate?: string }): Promise<CandidateDirectoryRow[]> {
+export async function fetchCandidatesDirectory(filters?: CandidatesDirectoryFilters): Promise<CandidateDirectoryRow[]> {
   const data = await fetchCandidatesDirectoryReport(filters);
   return data.candidates;
 }

@@ -2,9 +2,23 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   fetchCandidatesDirectoryReport,
   CandidateDirectoryRow,
-  CandidatesDirectoryAnalytics
+  CandidatesDirectoryAnalytics,
+  CandidatesDirectoryFilters
 } from '../api/usersApi';
-import { Search, Users, ChevronDown, ChevronUp, ShieldCheck, FolderOpen, BarChart3, Clock3 } from 'lucide-react';
+import {
+  Search,
+  Users,
+  ChevronDown,
+  ChevronUp,
+  ShieldCheck,
+  FolderOpen,
+  BarChart3,
+  Clock3,
+  SlidersHorizontal,
+  HandCoins,
+  Target,
+  RefreshCw
+} from 'lucide-react';
 
 interface CandidatesDirectoryPageProps {
   initialJobId?: string;
@@ -22,7 +36,41 @@ const EMPTY_ANALYTICS: CandidatesDirectoryAnalytics = {
   totalCashCollectedKsh: 0,
   firstPaymentAt: null,
   lastPaymentAt: null,
-  dailyCollections: []
+  dailyCollections: [],
+  totals: {
+    totalCandidateAccounts: 0,
+    totalApplicationsAllTime: 0,
+    totalAtestaAccounts: 0,
+    paidAtestaCandidatesAllTime: 0,
+    filteredCandidates: 0,
+    filteredWithApplications: 0,
+    filteredAtestaAccounts: 0,
+    filteredPaidAtestaAccounts: 0
+  },
+  funnelPercentages: {
+    applicationsVsTotalAccounts: 0,
+    atestaAccountsVsApplications: 0,
+    paidAtestaUsersVsAtestaAccounts: 0,
+    filteredApplicationsVsTotalAccounts: 0,
+    filteredAtestaAccountsVsApplications: 0,
+    filteredPaidAtestaUsersVsAtestaAccounts: 0
+  },
+  salesStageDistribution: {},
+  dropOff: {
+    registeredWithoutApplications: 0,
+    appliedWithoutAtesta: 0,
+    atestaWithoutPayment: 0
+  },
+  salesActions: []
+};
+
+const SALES_STAGE_LABELS: Record<string, string> = {
+  registered_no_application: 'Registered, no application',
+  applied_no_atesta: 'Applied, no Atesta',
+  atesta_inactive: 'Atesta inactive',
+  atesta_unpaid: 'Atesta active, unpaid',
+  paying_in_pipeline: 'Paid and in pipeline',
+  hired: 'Hired'
 };
 
 export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = ({
@@ -34,32 +82,77 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [applicationsOnly, setApplicationsOnly] = useState(false);
+  const [selectedActionId, setSelectedActionId] = useState<string>('all');
+
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [atestaStatus, setAtestaStatus] = useState<'any' | 'none' | 'created' | 'active' | 'inactive'>('any');
+  const [salesStageFilter, setSalesStageFilter] = useState('any');
+  const [hasPayments, setHasPayments] = useState<'any' | 'yes' | 'no'>('any');
+  const [hasApplications, setHasApplications] = useState<'any' | 'yes' | 'no'>('any');
+  const [platformActive, setPlatformActive] = useState<'any' | 'yes' | 'no'>('any');
+  const [minApplications, setMinApplications] = useState('');
+  const [maxApplications, setMaxApplications] = useState('');
+  const [minTotalPaidKsh, setMinTotalPaidKsh] = useState('');
+  const [sortBy, setSortBy] = useState<'registeredAt' | 'name' | 'totalApplications' | 'totalPaidKsh' | 'lastAppliedAt' | 'lastPaymentAt'>('registeredAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  useEffect(() => {
-    void loadData();
-  }, []);
+  const hasPaymentsBoolean = (value: 'any' | 'yes' | 'no') => {
+    if (value === 'yes') return true;
+    if (value === 'no') return false;
+    return undefined;
+  };
 
-  const loadData = async (filters?: { fromDate?: string; toDate?: string }) => {
+  const loadData = async (filters?: CandidatesDirectoryFilters) => {
     setLoading(true);
-    const data = await fetchCandidatesDirectoryReport(filters);
+    const requestFilters: CandidatesDirectoryFilters = {
+      ...(initialJobId ? { jobId: initialJobId } : {}),
+      ...(filters || {})
+    };
+
+    const data = await fetchCandidatesDirectoryReport(requestFilters);
     setRows(data.candidates);
     setPeriodAnalytics(data.analytics || EMPTY_ANALYTICS);
     setLoading(false);
   };
 
-  const applyDateFilter = async () => {
+  useEffect(() => {
+    void loadData();
+  }, [initialJobId]);
+
+  const applyFilters = async () => {
     await loadData({
       fromDate: fromDate || undefined,
-      toDate: toDate || undefined
+      toDate: toDate || undefined,
+      atestaStatus,
+      salesStage: salesStageFilter === 'any' ? undefined : salesStageFilter,
+      hasPayments: hasPaymentsBoolean(hasPayments),
+      hasApplications: hasPaymentsBoolean(hasApplications),
+      platformActive: hasPaymentsBoolean(platformActive),
+      minApplications: minApplications ? Number(minApplications) : undefined,
+      maxApplications: maxApplications ? Number(maxApplications) : undefined,
+      minTotalPaidKsh: minTotalPaidKsh ? Number(minTotalPaidKsh) : undefined,
+      sortBy,
+      sortOrder,
+      search: search || undefined
     });
   };
 
-  const clearDateFilter = async () => {
+  const clearAllFilters = async () => {
     setFromDate('');
     setToDate('');
+    setAtestaStatus('any');
+    setSalesStageFilter('any');
+    setHasPayments('any');
+    setHasApplications('any');
+    setPlatformActive('any');
+    setMinApplications('');
+    setMaxApplications('');
+    setMinTotalPaidKsh('');
+    setSortBy('registeredAt');
+    setSortOrder('desc');
+    setSearch('');
+    setSelectedActionId('all');
     await loadData();
   };
 
@@ -70,63 +163,44 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
       maximumFractionDigits: 0
     }).format(value || 0);
 
-  const scopedRows = useMemo(() => {
-    if (!initialJobId) return rows;
-
-    return rows
-      .map((row) => {
-        const scopedApplications = row.applications.filter((app) => app.jobId === initialJobId);
-        const statusSummary = scopedApplications.reduce<Record<string, number>>((acc, app) => {
-          acc[app.stage] = (acc[app.stage] || 0) + 1;
-          return acc;
-        }, {});
-
-        return {
-          ...row,
-          applications: scopedApplications,
-          totalApplications: scopedApplications.length,
-          lastAppliedAt: scopedApplications[0]?.appliedAt || null,
-          statusSummary
-        };
-      })
-      .filter((row) => row.totalApplications > 0);
-  }, [rows, initialJobId]);
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const baseRows = applicationsOnly ? scopedRows.filter((row) => row.totalApplications > 0) : scopedRows;
-    if (!q) return baseRows;
-    return baseRows.filter((row) => {
+    const byAction =
+      selectedActionId === 'all'
+        ? rows
+        : rows.filter((row) => Array.isArray(row.actionTags) && row.actionTags.includes(selectedActionId));
+
+    if (!q) return byAction;
+
+    return byAction.filter((row) => {
       const inProfile =
         row.name.toLowerCase().includes(q) ||
         row.email.toLowerCase().includes(q) ||
         row.phone.toLowerCase().includes(q) ||
-        row.location.toLowerCase().includes(q);
+        row.location.toLowerCase().includes(q) ||
+        String(row.salesStage || '').toLowerCase().includes(q);
       const inApplications = row.applications.some(
         (app) => app.jobTitle.toLowerCase().includes(q) || app.stage.toLowerCase().includes(q)
       );
       return inProfile || inApplications;
     });
-  }, [scopedRows, search, applicationsOnly]);
+  }, [rows, search, selectedActionId]);
 
   const analytics = useMemo(() => {
     const totalCandidates = filtered.length;
     const withApplications = filtered.filter((row) => row.totalApplications > 0).length;
     const withAtesta = filtered.filter((row) => row.hasAtestaAccount).length;
-    const atestaActive = filtered.filter((row) => row.atestaAccountActive).length;
-
-    const totalApplications = filtered.reduce((sum, row) => sum + row.totalApplications, 0);
-    const atestaCoverage = totalCandidates > 0 ? Math.round((withAtesta / totalCandidates) * 100) : 0;
+    const withPayments = filtered.filter((row) => (row.totalPaidKsh || 0) > 0).length;
 
     return {
       totalCandidates,
       withApplications,
       withAtesta,
-      atestaActive,
-      totalApplications,
-      atestaCoverage
+      withPayments
     };
   }, [filtered]);
+
+  const stageEntries = Object.entries(periodAnalytics.salesStageDistribution || {}).sort((a, b) => b[1] - a[1]);
 
   return (
     <div className="space-y-6">
@@ -143,72 +217,205 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
           </p>
         ) : (
           <p className="text-xs text-slate-500 mt-0.5">
-            View all registered candidates, application history, current statuses, and Atesta account readiness.
+            Sales funnel visibility from registration to Atesta payment conversion.
           </p>
         )}
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs max-w-xl">
-        <div className="relative">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search candidate, email, location, role, stage..."
-            className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-        <div className="pt-3 flex items-center gap-2">
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4 text-indigo-600" /> Dynamic Filters
+          </h3>
           <button
-            onClick={() => setApplicationsOnly((v) => !v)}
-            className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition ${
-              applicationsOnly
-                ? 'bg-indigo-600 text-white border-indigo-600'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
-            }`}
+            onClick={clearAllFilters}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg"
           >
-            {applicationsOnly ? 'Showing: Applied Only' : 'Filter: Applied Only'}
+            <RefreshCw className="h-3.5 w-3.5" /> Reset
           </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search candidate, stage, role..."
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+
+          <select
+            value={atestaStatus}
+            onChange={(e) => setAtestaStatus(e.target.value as any)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="any">Atesta: Any</option>
+            <option value="none">Atesta: Not created</option>
+            <option value="created">Atesta: Created</option>
+            <option value="active">Atesta: Active</option>
+            <option value="inactive">Atesta: Inactive</option>
+          </select>
+
+          <select
+            value={salesStageFilter}
+            onChange={(e) => setSalesStageFilter(e.target.value)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="any">Sales Stage: Any</option>
+            <option value="registered_no_application">Registered, no application</option>
+            <option value="applied_no_atesta">Applied, no Atesta</option>
+            <option value="atesta_inactive">Atesta inactive</option>
+            <option value="atesta_unpaid">Atesta active, unpaid</option>
+            <option value="paying_in_pipeline">Paid and in pipeline</option>
+            <option value="hired">Hired</option>
+          </select>
+
+          <select
+            value={hasApplications}
+            onChange={(e) => setHasApplications(e.target.value as any)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="any">Applications: Any</option>
+            <option value="yes">Has applications</option>
+            <option value="no">No applications</option>
+          </select>
+
+          <select
+            value={hasPayments}
+            onChange={(e) => setHasPayments(e.target.value as any)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="any">Payments: Any</option>
+            <option value="yes">Has payments</option>
+            <option value="no">No payments</option>
+          </select>
+
+          <select
+            value={platformActive}
+            onChange={(e) => setPlatformActive(e.target.value as any)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="any">Platform Account: Any</option>
+            <option value="yes">Platform active</option>
+            <option value="no">Platform inactive</option>
+          </select>
+
+          <input
+            type="number"
+            value={minApplications}
+            onChange={(e) => setMinApplications(e.target.value)}
+            placeholder="Min applications"
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+
+          <input
+            type="number"
+            value={maxApplications}
+            onChange={(e) => setMaxApplications(e.target.value)}
+            placeholder="Max applications"
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+
+          <input
+            type="number"
+            value={minTotalPaidKsh}
+            onChange={(e) => setMinTotalPaidKsh(e.target.value)}
+            placeholder="Min paid (KES)"
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="registeredAt">Sort: Registration date</option>
+            <option value="name">Sort: Name</option>
+            <option value="totalApplications">Sort: Applications</option>
+            <option value="totalPaidKsh">Sort: Paid amount</option>
+            <option value="lastAppliedAt">Sort: Last application</option>
+            <option value="lastPaymentAt">Sort: Last payment</option>
+          </select>
+
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as any)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="desc">Order: Descending</option>
+            <option value="asc">Order: Ascending</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={applyFilters}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl"
+          >
+            Apply Filters
+          </button>
+          <span className="text-[11px] text-slate-500">
+            Filters also recalculate analytics so sales can see conversion movement in each segment.
+          </span>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3">
-        <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">From Date</label>
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-slate-500">Applications vs Accounts</span>
+            <BarChart3 className="h-4 w-4 text-indigo-600" />
           </div>
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">To Date</label>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+          <div className="text-2xl font-black text-indigo-700 mt-1">
+            {periodAnalytics.funnelPercentages.applicationsVsTotalAccounts}%
           </div>
-          <button
-            onClick={applyDateFilter}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl"
-          >
-            Apply Date Filter
-          </button>
-          <button
-            onClick={clearDateFilter}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
-          >
-            Clear Filter
-          </button>
+          <p className="text-[10px] text-slate-500 mt-0.5">
+            {periodAnalytics.totals.totalApplicationsAllTime} applications / {periodAnalytics.totals.totalCandidateAccounts} accounts
+          </p>
         </div>
-        <p className="text-[11px] text-slate-500">
-          Date filter applies to registrations, applications, and payment analytics. Leave blank for all-time totals.
-        </p>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-slate-500">Atesta Creation vs Applications</span>
+            <Target className="h-4 w-4 text-emerald-600" />
+          </div>
+          <div className="text-2xl font-black text-emerald-700 mt-1">
+            {periodAnalytics.funnelPercentages.atestaAccountsVsApplications}%
+          </div>
+          <p className="text-[10px] text-slate-500 mt-0.5">
+            {periodAnalytics.totals.totalAtestaAccounts} Atesta / {periodAnalytics.totals.totalApplicationsAllTime} applications
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-slate-500">Paid Atesta vs Atesta Accounts</span>
+            <HandCoins className="h-4 w-4 text-amber-600" />
+          </div>
+          <div className="text-2xl font-black text-amber-700 mt-1">
+            {periodAnalytics.funnelPercentages.paidAtestaUsersVsAtestaAccounts}%
+          </div>
+          <p className="text-[10px] text-slate-500 mt-0.5">
+            {periodAnalytics.totals.paidAtestaCandidatesAllTime} paid / {periodAnalytics.totals.totalAtestaAccounts} Atesta accounts
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -218,7 +425,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
             <BarChart3 className="h-4 w-4 text-emerald-600" />
           </div>
           <div className="text-2xl font-black text-emerald-700 mt-1">{periodAnalytics.paidCandidatesInPeriod}</div>
-          <p className="text-[10px] text-slate-500 mt-0.5">Candidates who paid any amount</p>
+          <p className="text-[10px] text-slate-500 mt-0.5">Candidates who paid in selected period</p>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
@@ -249,6 +456,76 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
           <div className="text-2xl font-black text-sky-700 mt-1">{periodAnalytics.registrationsInPeriod}</div>
           <p className="text-[10px] text-slate-500 mt-0.5">Atesta registrations: {periodAnalytics.atestaRegistrationsInPeriod}</p>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+          <h3 className="text-sm font-extrabold text-slate-900 mb-3">Sales Stage Distribution</h3>
+          {stageEntries.length === 0 ? (
+            <p className="text-xs text-slate-500">No stage distribution available for this segment.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {stageEntries.map(([key, count]) => (
+                <div key={key} className="flex items-center justify-between text-xs bg-slate-50 rounded-md px-2 py-1 border border-slate-200">
+                  <span className="text-slate-700">{SALES_STAGE_LABELS[key] || key}</span>
+                  <span className="font-bold text-slate-900">{count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+          <h3 className="text-sm font-extrabold text-slate-900 mb-3">Drop-Off Risk</h3>
+          <div className="space-y-1.5 text-xs">
+            <div className="flex items-center justify-between bg-rose-50 border border-rose-200 rounded-md px-2 py-1">
+              <span className="text-rose-800">Registered without application</span>
+              <span className="font-black text-rose-900">{periodAnalytics.dropOff.registeredWithoutApplications}</span>
+            </div>
+            <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+              <span className="text-amber-800">Applied without Atesta</span>
+              <span className="font-black text-amber-900">{periodAnalytics.dropOff.appliedWithoutAtesta}</span>
+            </div>
+            <div className="flex items-center justify-between bg-indigo-50 border border-indigo-200 rounded-md px-2 py-1">
+              <span className="text-indigo-800">Atesta without payment</span>
+              <span className="font-black text-indigo-900">{periodAnalytics.dropOff.atestaWithoutPayment}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+        <h3 className="text-sm font-extrabold text-slate-900 mb-2">Sales Actions</h3>
+        {periodAnalytics.salesActions.length === 0 ? (
+          <p className="text-xs text-slate-500">No action recommendations generated for this segment.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelectedActionId('all')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border ${
+                selectedActionId === 'all'
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              All ({rows.length})
+            </button>
+            {periodAnalytics.salesActions.map((action) => (
+              <button
+                key={action.id}
+                onClick={() => setSelectedActionId(action.id)}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border ${
+                  selectedActionId === action.id
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+                title={action.description}
+              >
+                {action.label} ({action.count})
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
@@ -292,7 +569,6 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
             <BarChart3 className="h-4 w-4 text-blue-600" />
           </div>
           <div className="text-2xl font-black text-blue-700 mt-1">{analytics.withApplications}</div>
-          <p className="text-[10px] text-slate-500 mt-0.5">Total applications: {analytics.totalApplications}</p>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
@@ -301,15 +577,14 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
             <ShieldCheck className="h-4 w-4 text-emerald-600" />
           </div>
           <div className="text-2xl font-black text-emerald-700 mt-1">{analytics.withAtesta}</div>
-          <p className="text-[10px] text-slate-500 mt-0.5">Active Atesta: {analytics.atestaActive}</p>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase text-slate-500">Atesta Coverage</span>
-            <Clock3 className="h-4 w-4 text-amber-600" />
+            <span className="text-[11px] font-bold uppercase text-slate-500">Candidates With Payments</span>
+            <HandCoins className="h-4 w-4 text-amber-600" />
           </div>
-          <div className="text-2xl font-black text-amber-700 mt-1">{analytics.atestaCoverage}%</div>
+          <div className="text-2xl font-black text-amber-700 mt-1">{analytics.withPayments}</div>
         </div>
       </div>
 
@@ -322,7 +597,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
           <div className="py-10 text-center text-xs text-slate-400">Loading candidate directory...</div>
         ) : filtered.length === 0 ? (
           <div className="py-10 text-center text-xs text-slate-500 border border-dashed border-slate-200 rounded-xl">
-            No candidates matched your search.
+            No candidates matched your active filters.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -331,10 +606,10 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[10px]">
                   <th className="p-3">Candidate</th>
                   <th className="p-3">Platform Account</th>
-                  <th className="p-3">Atesta Account</th>
-                  <th className="p-3">Atesta Created</th>
+                  <th className="p-3">Atesta</th>
+                  <th className="p-3">Sales Stage</th>
                   <th className="p-3">Applications</th>
-                  <th className="p-3">Last Applied</th>
+                  <th className="p-3">Paid</th>
                   <th className="p-3 text-right">Details</th>
                 </tr>
               </thead>
@@ -368,13 +643,9 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                             {row.hasAtestaAccount ? (row.atestaAccountActive ? 'Created (Active)' : 'Created (Inactive)') : 'Not Created'}
                           </span>
                         </td>
-                        <td className="p-3 text-slate-600 text-[11px]">
-                          {row.atestaRegisteredAt ? new Date(row.atestaRegisteredAt).toLocaleString() : 'N/A'}
-                        </td>
+                        <td className="p-3 text-slate-700">{SALES_STAGE_LABELS[row.salesStage || ''] || row.salesStage || 'Unknown'}</td>
                         <td className="p-3 font-bold text-slate-800">{row.totalApplications}</td>
-                        <td className="p-3 text-slate-600">
-                          {row.lastAppliedAt ? new Date(row.lastAppliedAt).toLocaleString() : 'Never applied'}
-                        </td>
+                        <td className="p-3 font-bold text-emerald-700">{formatCurrency(row.totalPaidKsh || 0)}</td>
                         <td className="p-3 text-right">
                           <button
                             onClick={() => setExpandedId(isOpen ? null : row.id)}
@@ -396,27 +667,26 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                                 </h4>
                                 <p className="text-xs text-slate-700">Registered: {new Date(row.registeredAt).toLocaleString()}</p>
                                 <p className="text-xs text-slate-700">Atesta ID: {row.atestaAccountId || 'Not linked yet'}</p>
-                                <p className="text-xs text-slate-700">
-                                  Atesta Created: {row.atestaRegisteredAt ? new Date(row.atestaRegisteredAt).toLocaleString() : 'N/A'}
-                                </p>
+                                <p className="text-xs text-slate-700">Days since registration: {row.daysSinceRegistration ?? 'N/A'}</p>
+                                <p className="text-xs text-slate-700">Days since activity: {row.daysSinceLastActivity ?? 'N/A'}</p>
                               </div>
 
                               <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
                                 <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
-                                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Status Summary
+                                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Sales Actions
                                 </h4>
-                                {Object.keys(row.statusSummary).length === 0 ? (
-                                  <p className="text-xs text-slate-500">No applications yet.</p>
+                                {!row.actionTags || row.actionTags.length === 0 ? (
+                                  <p className="text-xs text-slate-500">No immediate action suggestion.</p>
                                 ) : (
-                                  <div className="space-y-1">
-                                    {Object.entries(row.statusSummary).map(([stage, count]) => (
-                                      <div key={stage} className="flex items-center justify-between text-xs bg-slate-50 rounded-md px-2 py-1 border border-slate-200">
-                                        <span className="text-slate-700">{stage}</span>
-                                        <span className="font-bold text-slate-900">{count}</span>
-                                      </div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {row.actionTags.map((tag) => (
+                                      <span key={tag} className="px-2 py-0.5 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] font-bold">
+                                        {tag.replace(/_/g, ' ')}
+                                      </span>
                                     ))}
                                   </div>
                                 )}
+                                <p className="text-xs text-slate-700">Last payment: {row.lastPaymentAt ? new Date(row.lastPaymentAt).toLocaleString() : 'Never'}</p>
                               </div>
 
                               <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
