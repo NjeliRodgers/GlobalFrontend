@@ -120,6 +120,17 @@ export interface CandidateDirectoryRow {
     appliedAt: string;
     lastUpdated: string;
     documentsCount: number;
+    assignedPackageIds?: string[];
+    assignedPackages?: Array<{
+      id: string;
+      packageId: string;
+      name: string;
+    }>;
+    voucher?: {
+      code: string;
+      redeemedAt: string | null;
+      issuedAt: string | null;
+    } | null;
   }>;
   totalPaidKsh?: number;
   paidTransactionsCount?: number;

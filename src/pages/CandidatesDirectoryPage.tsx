@@ -17,7 +17,9 @@ import {
   SlidersHorizontal,
   HandCoins,
   Target,
-  RefreshCw
+  RefreshCw,
+  Copy,
+  Check
 } from 'lucide-react';
 
 interface CandidatesDirectoryPageProps {
@@ -83,6 +85,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedActionId, setSelectedActionId] = useState<string>('all');
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -162,6 +165,12 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
       currency: 'KES',
       maximumFractionDigits: 0
     }).format(value || 0);
+
+  const copyCode = async (code: string) => {
+    await navigator.clipboard.writeText(code);
+    setCopiedCode(code);
+    window.setTimeout(() => setCopiedCode(null), 1800);
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -696,12 +705,38 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                                 {row.applications.length === 0 ? (
                                   <p className="text-xs text-slate-500">No job applications submitted yet.</p>
                                 ) : (
-                                  <div className="space-y-1 max-h-52 overflow-y-auto pr-1">
+                                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                                     {row.applications.map((app) => (
-                                      <div key={app.applicationId} className="text-xs bg-slate-50 rounded-md px-2 py-1.5 border border-slate-200">
+                                      <div key={app.applicationId} className="text-xs bg-slate-50 rounded-md px-2 py-2 border border-slate-200 space-y-1">
                                         <div className="font-semibold text-slate-900">{app.jobTitle}</div>
                                         <div className="text-[10px] text-slate-500">Status: {app.stage}</div>
                                         <div className="text-[10px] text-slate-500">Applied: {new Date(app.appliedAt).toLocaleDateString()}</div>
+                                        {(app.assignedPackages?.length || 0) > 0 && (
+                                          <div className="text-[10px] text-indigo-700">
+                                            Package ID(s): {app.assignedPackages?.map((pkg) => pkg.packageId).join(', ')}
+                                          </div>
+                                        )}
+                                        {app.voucher?.code ? (
+                                          <div className="flex items-center justify-between gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1">
+                                            <div>
+                                              <div className="text-[10px] text-indigo-700 font-semibold">One-time Access Code</div>
+                                              <div className="font-mono tracking-wider text-indigo-900 font-bold">{app.voucher.code}</div>
+                                              <div className="text-[10px] text-slate-500">
+                                                {app.voucher.redeemedAt ? `Used on ${new Date(app.voucher.redeemedAt).toLocaleString()}` : 'Not used yet'}
+                                              </div>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => void copyCode(app.voucher!.code)}
+                                              className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md border border-indigo-300 bg-white hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold"
+                                            >
+                                              {copiedCode === app.voucher.code ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                                              {copiedCode === app.voucher.code ? 'Copied' : 'Copy'}
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <div className="text-[10px] text-amber-700">No course access code generated for this application.</div>
+                                        )}
                                       </div>
                                     ))}
                                   </div>

@@ -82,12 +82,13 @@ export const CandidatePortalPage: React.FC<CandidatePortalPageProps> = ({
       fetchJobs()
     ]);
 
-    // Match candidate applications by ID or email
-    const myApps = appsData.filter(
-      (a) => a.candidateId === user?.id || a.candidateEmail.toLowerCase() === candidateEmail.toLowerCase()
-    );
+    // Match candidate applications by ID or email and always show the
+    // candidate's complete history ordered from newest to oldest.
+    const myApps = appsData
+      .filter((a) => a.candidateId === user?.id || a.candidateEmail.toLowerCase() === candidateEmail.toLowerCase())
+      .sort((a, b) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime());
 
-    setApplications(myApps.length > 0 ? myApps : appsData.filter((a) => a.candidateName === 'Elena Rostova' || a.candidateName === candidateName));
+    setApplications(myApps);
     setEmailLogs(emailsData);
     setInterviews(interviewsData.filter((i) => i.candidateEmail?.toLowerCase() === candidateEmail.toLowerCase()));
     setJobs(jobsData);

@@ -67,6 +67,24 @@ export async function bulkUpdateApplicationStages(applicationIds: string[], stag
   return data.applications;
 }
 
+export async function sendApplicationAccessCodeEmail(applicationId: string): Promise<{
+  delivered: boolean;
+  voucher: { code: string; redeemedAt: string | null; issuedAt: string | null };
+  packageRefs: string[];
+}> {
+  const res = await apiFetch(`/applications/${applicationId}/send-access-code-email`, {
+    method: 'POST',
+    headers: jsonHeaders
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to send access code email');
+  return {
+    delivered: !!data.delivered,
+    voucher: data.voucher,
+    packageRefs: data.packageRefs || []
+  };
+}
+
 export async function fetchApplicationReadiness(applicationId: string): Promise<{
   application: Application;
   readinessProgress: ReadinessProgress;

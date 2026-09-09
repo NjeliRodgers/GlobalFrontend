@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Application, ApplicationStage } from '../types';
-import { fetchApplications, updateApplicationStage } from '../api/applicationsApi';
+import { fetchApplications, updateApplicationStage, sendApplicationAccessCodeEmail } from '../api/applicationsApi';
 import { StatusBadge } from '../components/StatusBadge';
 import { ScheduleInterviewModal } from '../components/ScheduleInterviewModal';
 import { scheduleInterview } from '../api/interviewsApi';
@@ -15,7 +15,10 @@ import {
   Award,
   ChevronRight,
   Calendar,
-  UserRound
+  UserRound,
+  Mail,
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
 
 interface PipelinePageProps {
@@ -54,6 +57,8 @@ export const PipelinePage: React.FC<PipelinePageProps> = ({ initialJobId }) => {
 
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [scheduleModalApp, setScheduleModalApp] = useState<Application | null>(null);
+  const [sendingAccessEmailForId, setSendingAccessEmailForId] = useState<string | null>(null);
+  const [accessEmailResult, setAccessEmailResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   useEffect(() => {
     loadApplications();
@@ -102,6 +107,25 @@ export const PipelinePage: React.FC<PipelinePageProps> = ({ initialJobId }) => {
   const handleConfirmScheduleInterview = async (data: any) => {
     await scheduleInterview(data);
     await loadApplications();
+  };
+
+  const handleSendAccessCodeEmail = async () => {
+    if (!selectedApp) return;
+    setSendingAccessEmailForId(selectedApp.id);
+    setAccessEmailResult(null);
+    try {
+      const result = await sendApplicationAccessCodeEmail(selectedApp.id);
+      setAccessEmailResult({
+        ok: result.delivered,
+        message: result.delivered
+          ? `Access-code email sent to ${selectedApp.candidateEmail}. Code: ${result.voucher.code}.`
+          : `Send attempted but delivery was not confirmed for ${selectedApp.candidateEmail}.`
+      });
+    } catch (err: any) {
+      setAccessEmailResult({ ok: false, message: err.message || 'Failed to send access-code email.' });
+    } finally {
+      setSendingAccessEmailForId(null);
+    }
   };
 
   return (
@@ -364,6 +388,14 @@ export const PipelinePage: React.FC<PipelinePageProps> = ({ initialJobId }) => {
 
               <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
                 <button
+                  onClick={() => void handleSendAccessCodeEmail()}
+                  disabled={sendingAccessEmailForId === selectedApp.id}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg disabled:opacity-50"
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  {sendingAccessEmailForId === selectedApp.id ? 'Sending Access Email...' : 'Send Atesta Access Code Email'}
+                </button>
+                <button
                   onClick={() => setScheduleModalApp(selectedApp)}
                   className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg"
                 >
@@ -371,6 +403,19 @@ export const PipelinePage: React.FC<PipelinePageProps> = ({ initialJobId }) => {
                   Schedule Interview
                 </button>
               </div>
+
+              {accessEmailResult && (
+                <div
+                  className={`rounded-lg border px-3 py-2 text-xs font-semibold flex items-center gap-2 ${
+                    accessEmailResult.ok
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : 'border-rose-200 bg-rose-50 text-rose-700'
+                  }`}
+                >
+                  {accessEmailResult.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                  {accessEmailResult.message}
+                </div>
+              )}
             </div>
           </div>
         </div>
