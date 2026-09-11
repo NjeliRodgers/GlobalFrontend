@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ApexQuestion, ApexExam, ApexInterviewProduct, ApexCourse, ApexCourseModule, ApexPackage, PaystackPayment, AiInterviewSession, ApexCertificate } from '../types';
 import PackageInstructionsModal from '../components/PackageInstructionsModal';
+import { NotesRichEditor } from '../components/NotesRichEditor';
+import { toEditableNotesHtml, getTocHeadings } from '../utils/moduleNotesFormat';
 import {
   getApexExams,
   saveApexExam,
@@ -869,7 +871,13 @@ export const ApexRecruiterPage: React.FC = () => {
                 {questions.filter((q) => q.examId === managingQuestionsForExam.id).length} attached · check a question to attach it here, uncheck to return it to the bank.
               </p>
               <div className="max-h-96 overflow-y-auto space-y-2 pr-1">
-                {questions.map((q) => {
+                {[...questions]
+                  .sort((a, b) => {
+                    const aTop = a.examId === managingQuestionsForExam.id ? 0 : 1;
+                    const bTop = b.examId === managingQuestionsForExam.id ? 0 : 1;
+                    return aTop - bTop;
+                  })
+                  .map((q) => {
                   const attached = q.examId === managingQuestionsForExam.id;
                   const attachedElsewhere = !!q.examId && q.examId !== managingQuestionsForExam.id;
                   return (
@@ -1155,24 +1163,17 @@ export const ApexRecruiterPage: React.FC = () => {
                   <div>
                     <label className="block text-xs font-bold text-slate-300 mb-1">Notes (supports many paragraphs)</label>
                     <p className="text-[10px] text-slate-400 mb-1.5">
-                      Separate paragraphs with a blank line. To define the Table of Contents yourself, start a paragraph with{' '}
-                      <code className="text-indigo-300">## </code> followed by the subtitle — e.g.{' '}
-                      <code className="text-indigo-300">## Handling Difficult Guests</code>. Every line prefixed this way becomes a
-                      clickable entry in the candidate's Table of Contents.
+                      Type or paste your notes — bold, italic, underline and color all work. Paste straight from the PDF: each
+                      paragraph keeps the exact spacing it had in the source, no manual clean-up needed. To add an entry to the
+                      candidate's Table of Contents, put the cursor on that line and click <strong>Subtitle</strong>.
                     </p>
-                    <textarea
+                    <NotesRichEditor
                       value={editingModule.contentBody || ''}
-                      onChange={(e) => setEditingModule({ ...editingModule, contentBody: e.target.value })}
-                      rows={12}
-                      placeholder={'## First Subtitle\nWrite the paragraph for this subtitle here...\n\n## Second Subtitle\nMore notes here...'}
-                      className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                      onChange={(html) => setEditingModule({ ...editingModule, contentBody: html })}
+                      placeholder="Write or paste the module notes here..."
                     />
                     {(() => {
-                      const headings = (editingModule.contentBody || '')
-                        .split(/\n\s*\n/)
-                        .map((p) => p.trim())
-                        .filter((p) => p.startsWith('## '))
-                        .map((p) => p.replace(/^##\s*/, ''));
+                      const headings = getTocHeadings(editingModule.contentBody || '');
                       return headings.length > 0 ? (
                         <div className="mt-2 p-2.5 bg-slate-900 border border-slate-800 rounded-xl">
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Table of Contents Preview</p>
@@ -1186,7 +1187,38 @@ export const ApexRecruiterPage: React.FC = () => {
                         </div>
                       ) : (
                         <p className="text-[10px] text-amber-500 mt-1.5">
-                          No subtitles detected yet — no Table of Contents will show for this module until you add at least one "## " line.
+                          No subtitles yet — select a line and click "Subtitle" to add one to the candidate's Table of Contents.
+                        </p>
+                      );
+                    })()}
+                  </div>                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Notes (supports many paragraphs)</label>
+                    <p className="text-[10px] text-slate-400 mb-1.5">
+                      Type or paste your notes — bold, italic, underline and color all work. Paste straight from the PDF: each
+                      paragraph keeps the exact spacing it had in the source, no manual clean-up needed. To add an entry to the
+                      candidate's Table of Contents, put the cursor on that line and click <strong>Subtitle</strong>.
+                    </p>
+                    <NotesRichEditor
+                      value={editingModule.contentBody || ''}
+                      onChange={(html) => setEditingModule({ ...editingModule, contentBody: html })}
+                      placeholder="Write or paste the module notes here..."
+                    />
+                    {(() => {
+                      const headings = getTocHeadings(editingModule.contentBody || '');
+                      return headings.length > 0 ? (
+                        <div className="mt-2 p-2.5 bg-slate-900 border border-slate-800 rounded-xl">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Table of Contents Preview</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {headings.map((h, i) => (
+                              <span key={i} className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[10px] text-indigo-300">
+                                {h}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-amber-500 mt-1.5">
+                          No subtitles yet — select a line and click "Subtitle" to add one to the candidate's Table of Contents.
                         </p>
                       );
                     })()}
@@ -1368,7 +1400,7 @@ export const ApexRecruiterPage: React.FC = () => {
                         {m.quiz && m.quiz.length > 0 && <HelpCircle className="h-3 w-3 text-amber-400"><title>{m.quiz.length} quiz question(s)</title></HelpCircle>}
                       </span>
                       <div className="flex items-center gap-2">
-                        <button onClick={() => setEditingModule(m)} className="p-1.5 text-indigo-400 hover:bg-indigo-950 rounded-lg cursor-pointer">
+                        <button onClick={() => setEditingModule({ ...m, contentBody: toEditableNotesHtml(m.contentBody) })} className="p-1.5 text-indigo-400 hover:bg-indigo-950 rounded-lg cursor-pointer">
                           <Edit2 className="h-3.5 w-3.5" />
                         </button>
                         <button onClick={() => handleDeleteModule(m.id)} className="p-1.5 text-rose-400 hover:bg-rose-950 rounded-lg cursor-pointer">

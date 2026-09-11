@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ApexExam, ApexQuestion } from '../types';
-import { saveApexExam, saveApexQuestion } from '../api/apexAssessmentApi';
+import { saveApexExam, saveApexQuestion, uploadApexQuestionsCsv } from '../api/apexAssessmentApi';
 import {
   ArrowLeft,
   Save,
@@ -12,7 +12,9 @@ import {
   Info,
   SlidersHorizontal,
   Bot,
-  Eye
+  Eye,
+  Upload,
+  X
 } from 'lucide-react';
 
 interface NewExamBuilderPageProps {
@@ -60,7 +62,16 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
   const [error, setError] = useState('');
   const [keyword, setKeyword] = useState('');
   const [autoSelectMessage, setAutoSelectMessage] = useState('');
+  const [importedQuestions, setImportedQuestions] = useState<ApexQuestion[]>([]);
+  const [lastImportBatch, setLastImportBatch] = useState<ApexQuestion[]>([]);
+  const [showImportedPool, setShowImportedPool] = useState(false);
+  const [uploadingCsv, setUploadingCsv] = useState(false);
+  const [csvImportError, setCsvImportError] = useState('');
 
+  const allQuestions = useMemo(() => {
+    const extra = importedQuestions.filter((iq) => !questions.some((q) => q.id === iq.id));
+    return [...questions, ...extra];
+  }, [questions, importedQuestions]);
   const toggleQuestion = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -91,7 +102,7 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
     const kw = keyword.trim().toLowerCase();
     if (!kw) return;
 
-    const matches = questions.filter(
+    const matches = allQuestions.filter(
       (q) => q.question.toLowerCase().includes(kw) || (q.category || '').toLowerCase().includes(kw)
     );
     const required = draft.questionsPerAttempt || 0;
@@ -123,13 +134,31 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
     }
   };
 
+    const handleImportCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploadingCsv(true);
+    setCsvImportError('');
+    try {
+      const result = await uploadApexQuestionsCsv(file);
+      setImportedQuestions((prev) => [...prev, ...result.insertedQuestions]);
+      setLastImportBatch(result.insertedQuestions);
+      setShowImportedPool(true);
+    } catch (err: any) {
+      setCsvImportError(err.message || 'Failed to import CSV');
+    } finally {
+      setUploadingCsv(false);
+    }
+  };
+
   const filteredQuestions = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return questions;
-    return questions.filter(
+    if (!q) return allQuestions;
+    return allQuestions.filter(
       (item) => item.question.toLowerCase().includes(q) || (item.category || '').toLowerCase().includes(q)
     );
-  }, [questions, searchQuery]);
+  }, [allQuestions, searchQuery]);
 
   const selectedCount = selectedIds.size;
   const required = draft.questionsPerAttempt || 0;
@@ -164,7 +193,7 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
     try {
       const savedExam = await saveApexExam(draft);
       for (const id of selectedIds) {
-        const question = questions.find((item) => item.id === id);
+        const question = allQuestions.find((item) => item.id === id);
         if (question) {
           await saveApexQuestion({ ...question, examId: savedExam.id });
         }
@@ -493,10 +522,85 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
             )}
           </div>
 
+          <div className="px-6 py-4 border-b border-indigo-200 bg-indigo-50 flex items-center gap-3 flex-wrap">
+            <div className="text-[11px] font-extrabold text-indigo-700 uppercase tracking-wide shrink-0">Import CSV</div>
+            <label className="px-3 py-2 text-[10px] font-bold text-indigo-700 bg-white border border-indigo-300 rounded-lg hover:bg-indigo-100 cursor-pointer whitespace-nowrap flex items-center gap-1.5">
+              <Upload className="h-3.5 w-3.5" />
+              {uploadingCsv ? 'Uploading…' : 'Upload CSV / Excel File'}
+              <input type="file" accept=".csv,.xlsx,.xls" onChange={handleImportCsv} disabled={uploadingCsv} className="hidden" />
+            </label>
+            {importedQuestions.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setLastImportBatch(importedQuestions);
+                  setShowImportedPool(true);
+                }}
+                className="px-3 py-2 text-[10px] font-bold text-indigo-700 bg-white border border-indigo-300 rounded-lg hover:bg-indigo-100 cursor-pointer whitespace-nowrap"
+              >
+                View Imported ({importedQuestions.length})
+              </button>
+            )}
+            <p className="text-[10px] text-indigo-700 basis-full">
+              Loads straight into this exam's pool below, unattached — tick the ones you want, same as any other question.
+            </p>
+            {csvImportError && <p className="w-full text-[11px] font-semibold text-rose-600">{csvImportError}</p>}
+          </div>
+
+          {showImportedPool && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900">Imported from CSV</h3>
+                    <p className="text-xs text-slate-500">
+                      {lastImportBatch.length} question{lastImportBatch.length === 1 ? '' : 's'} loaded — tick the ones you want in this exam.
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => setShowImportedPool(false)} className="p-1 text-slate-400 hover:text-slate-900 cursor-pointer">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="p-6 space-y-2 overflow-y-auto">
+                  {lastImportBatch.map((q) => {
+                    const checked = selectedIds.has(q.id);
+                    return (
+                      <label
+                        key={q.id}
+                        className={`block p-3.5 rounded-2xl border cursor-pointer transition ${
+                          checked ? 'border-emerald-400 bg-emerald-50/60' : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <input type="checkbox" checked={checked} onChange={() => toggleQuestion(q.id)} className="mt-1 h-4 w-4 accent-emerald-600" />
+                          <div className="flex-1 space-y-1.5">
+                            {q.category && (
+                              <span className="text-[10px] font-extrabold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">{q.category}</span>
+                            )}
+                            <p className="text-xs font-bold text-slate-900">{q.question}</p>
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="px-6 py-4 border-t border-slate-100 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowImportedPool(false)}
+                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="p-6 space-y-2 max-h-[36rem] overflow-y-auto">
             {filteredQuestions.length === 0 && (
               <p className="text-center py-8 text-slate-400 text-xs">
-                {questions.length === 0
+                {allQuestions.length === 0
                   ? 'No questions in the bank yet — add some in the Question Bank tab first.'
                   : 'No questions match your search.'}
               </p>

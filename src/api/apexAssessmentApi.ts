@@ -187,6 +187,7 @@ export interface BulkQuestionUploadResult {
   skipped: number;
   totalRows: number;
   rowErrors: { row: number; reason: string }[];
+  insertedQuestions: ApexQuestion[];
 }
 
 // CSV bulk-load of questions into the shared question bank. Same multipart
