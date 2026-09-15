@@ -36,6 +36,40 @@ export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const timeout = setTimeout(() => controller.abort(), 20000); // 20s — mobile networks are slower
 
   return fetch(url, { ...init, headers, signal: controller.signal })
+    .then((res) => {
+      // If the backend signals an unauthorized/expired session, clear local token
+      // and notify the app so the UI can log the user out.
+      if (res.status === 401) {
+        setStoredToken(null);
+        try {
+          window.dispatchEvent(new Event('session:expired'));
+        } catch (e) {
+          // ignore
+        }
+      } else {
+        // Also defensively inspect JSON error payloads (some endpoints may
+        // return 200 with an { error: 'Invalid or expired session...' } body).
+        try {
+          res.clone()
+            .json()
+            .then((body: any) => {
+              if (body && typeof body.error === 'string' && body.error.toLowerCase().includes('invalid or expired session')) {
+                setStoredToken(null);
+                try {
+                  window.dispatchEvent(new Event('session:expired'));
+                } catch (e) {
+                  // ignore
+                }
+              }
+            })
+            .catch(() => {});
+        } catch (e) {
+          // ignore non-json responses
+        }
+      }
+
+      return res;
+    })
     .catch((err) => {
       if (err.name === 'AbortError') {
         throw new Error('The request timed out. Please check your internet connection and try again.');
