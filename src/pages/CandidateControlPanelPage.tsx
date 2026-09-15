@@ -5,7 +5,7 @@ import {
   Loader2,
   Mail,
   MessageCircle,
-  User as UserIcon,
+  UserPlus,
   Phone,
   MapPin,
   ShieldCheck,
@@ -21,14 +21,20 @@ import {
   AlertTriangle,
   FileText,
   History,
-  ExternalLink
+  ExternalLink,
+  X
 } from 'lucide-react';
+import { Job } from '../types';
 import {
   fetchCandidateSupportProfile,
-  sendCandidateSupportEmail,
   SupportProfile,
   SupportApplication
 } from '../api/supportApi';
+import {
+  createCandidateApplicationAndSendAccessCode,
+  sendApplicationAccessCodeEmail
+} from '../api/applicationsApi';
+import { fetchJobs } from '../api/jobsApi';
 
 const ATESTA_URL = 'https://atesta.mobit.co.ke/';
 
@@ -85,6 +91,19 @@ export const CandidateControlPanelPage: React.FC = () => {
   const [codeCopied, setCodeCopied] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [panelNotice, setPanelNotice] = useState<{ ok: boolean; message: string } | null>(null);
+  const [showNonRegisteredModal, setShowNonRegisteredModal] = useState(false);
+  const [nonRegisteredSending, setNonRegisteredSending] = useState(false);
+  const [nonRegisteredError, setNonRegisteredError] = useState('');
+  const [jobsLoading, setJobsLoading] = useState(false);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [nonRegisteredForm, setNonRegisteredForm] = useState({
+    candidateName: '',
+    candidateEmail: '',
+    candidatePhone: '',
+    candidateLocation: '',
+    jobId: ''
+  });
 
   const activeApplication: SupportApplication | undefined =
     profile?.applications.find((a) => a.id === activeApplicationId) || profile?.applications[0];
@@ -95,6 +114,7 @@ export const CandidateControlPanelPage: React.FC = () => {
     setLoading(true);
     setError('');
     setSendResult(null);
+    setPanelNotice(null);
     setProfile(null);
     try {
       const data = await fetchCandidateSupportProfile(email.trim());
@@ -108,24 +128,111 @@ export const CandidateControlPanelPage: React.FC = () => {
   };
 
   const handleSendEmail = async () => {
-    if (!profile) return;
+    if (!profile || !activeApplication) return;
     setSending(true);
     setSendResult(null);
+    setPanelNotice(null);
     try {
-      const result = await sendCandidateSupportEmail(profile.candidate.email, activeApplication?.id);
+      const result = await sendApplicationAccessCodeEmail(activeApplication.id);
       setSendResult({
         ok: result.delivered,
         message: result.delivered
-          ? `Support email delivered to ${profile.candidate.email}.`
-          : `Email send failed — SendGrid did not confirm delivery to ${profile.candidate.email}. Check email server configuration or try again.`
+          ? `Access-code email sent to ${profile.candidate.email}.`
+          : `Send attempted but delivery was not confirmed for ${profile.candidate.email}.`
       });
       // Refresh email history so the log we just created shows up immediately.
       const refreshed = await fetchCandidateSupportProfile(profile.candidate.email);
       setProfile(refreshed);
     } catch (err: any) {
-      setSendResult({ ok: false, message: err.message || 'Failed to send support email.' });
+      setSendResult({ ok: false, message: err.message || 'Failed to send access-code email.' });
     } finally {
       setSending(false);
+    }
+  };
+
+  const openNonRegisteredModal = async () => {
+    setShowNonRegisteredModal(true);
+    setNonRegisteredError('');
+    setPanelNotice(null);
+
+    if (jobs.length > 0) {
+      return;
+    }
+
+    setJobsLoading(true);
+    try {
+      const allJobs = await fetchJobs();
+      const activeJobs = allJobs
+        .filter((job) => job.status === 'active')
+        .sort((a, b) => a.title.localeCompare(b.title));
+      setJobs(activeJobs);
+    } catch (err: any) {
+      setNonRegisteredError(err?.message || 'Unable to load open positions.');
+    } finally {
+      setJobsLoading(false);
+    }
+  };
+
+  const closeNonRegisteredModal = () => {
+    if (nonRegisteredSending) return;
+    setShowNonRegisteredModal(false);
+    setNonRegisteredError('');
+  };
+
+  const handleSendToNonRegistered = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setNonRegisteredError('');
+    setPanelNotice(null);
+
+    const payload = {
+      candidateName: nonRegisteredForm.candidateName.trim(),
+      candidateEmail: nonRegisteredForm.candidateEmail.trim(),
+      candidatePhone: nonRegisteredForm.candidatePhone.trim(),
+      candidateLocation: nonRegisteredForm.candidateLocation.trim(),
+      jobId: nonRegisteredForm.jobId
+    };
+
+    if (!payload.candidateName || !payload.candidateEmail || !payload.jobId) {
+      setNonRegisteredError('Candidate name, email, and position are required.');
+      return;
+    }
+
+    setNonRegisteredSending(true);
+    try {
+      const result = await createCandidateApplicationAndSendAccessCode(payload);
+
+      const candidateStatus = result.candidateCreated ? 'Candidate account created' : 'Candidate account reused';
+      const appStatus = result.applicationCreated ? 'application created' : 'existing application reused';
+
+      setPanelNotice({
+        ok: result.delivered,
+        message: result.delivered
+          ? `${candidateStatus}; ${appStatus}; access-code email sent to ${payload.candidateEmail}.`
+          : `Send attempted for ${payload.candidateEmail}, but delivery was not confirmed.`
+      });
+
+      setEmail(payload.candidateEmail);
+      setShowNonRegisteredModal(false);
+      setNonRegisteredForm({
+        candidateName: '',
+        candidateEmail: '',
+        candidatePhone: '',
+        candidateLocation: '',
+        jobId: ''
+      });
+
+      try {
+        const refreshed = await fetchCandidateSupportProfile(payload.candidateEmail);
+        setProfile(refreshed);
+        const createdOrExistingApp = refreshed.applications.find((item) => item.id === result.application.id);
+        setActiveApplicationId(createdOrExistingApp?.id || refreshed.applications[0]?.id || null);
+      } catch {
+        // Keep the success notice even if profile refresh fails.
+      }
+    } catch (err: any) {
+      setNonRegisteredError(err?.message || 'Failed to create candidate and send access code.');
+    } finally {
+      setNonRegisteredSending(false);
     }
   };
 
@@ -183,11 +290,31 @@ export const CandidateControlPanelPage: React.FC = () => {
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             Import User Details
           </button>
+          <button
+            type="button"
+            onClick={() => void openNonRegisteredModal()}
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition cursor-pointer flex items-center justify-center gap-2"
+          >
+            <UserPlus className="h-4 w-4" />
+            Send Atesta Code To Non-Registered User
+          </button>
         </form>
         {error && (
           <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
             <AlertTriangle className="h-4 w-4 shrink-0" />
             {error}
+          </div>
+        )}
+        {panelNotice && (
+          <div
+            className={`mt-3 flex items-center gap-2 text-xs font-semibold rounded-lg px-3 py-2 border ${
+              panelNotice.ok
+                ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                : 'text-rose-700 bg-rose-50 border-rose-200'
+            }`}
+          >
+            {panelNotice.ok ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
+            {panelNotice.message}
           </div>
         )}
       </div>
@@ -380,17 +507,17 @@ export const CandidateControlPanelPage: React.FC = () => {
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Send Details To Candidate</h3>
             <p className="text-xs text-slate-500">
-              Sends the imported application, package, and voucher details straight to{' '}
+              Sends the same access-code email used in Candidates Directory to{' '}
               <strong>{profile.candidate.email}</strong> — no retyping needed.
             </p>
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={handleSendEmail}
-                disabled={sending}
+                disabled={sending || !activeApplication}
                 className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm transition cursor-pointer flex items-center gap-2"
               >
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                Send Email
+                Send Access Code Email
               </button>
 
               <button
@@ -446,6 +573,141 @@ export const CandidateControlPanelPage: React.FC = () => {
             )}
           </div>
         </>
+      )}
+
+      {showNonRegisteredModal && (
+        <div className="fixed inset-0 z-40 bg-slate-900/40 px-4 py-6 sm:py-12 overflow-y-auto">
+          <div className="max-w-2xl mx-auto bg-white rounded-2xl border border-slate-200 shadow-xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">Send Atesta Code To Non-Registered User</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  This creates the candidate record, creates or reuses their job application, and sends one access-code email.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeNonRegisteredModal}
+                disabled={nonRegisteredSending}
+                className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSendToNonRegistered} className="p-6 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">
+                    Position Applied
+                  </label>
+                  <select
+                    value={nonRegisteredForm.jobId}
+                    onChange={(e) => setNonRegisteredForm((prev) => ({ ...prev, jobId: e.target.value }))}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled={jobsLoading || nonRegisteredSending}
+                  >
+                    <option value="">Select a position</option>
+                    {jobs.map((job) => (
+                      <option key={job.id} value={job.id}>
+                        {job.title} {job.location ? `- ${job.location}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">
+                    Candidate Name
+                  </label>
+                  <input
+                    type="text"
+                    value={nonRegisteredForm.candidateName}
+                    onChange={(e) => setNonRegisteredForm((prev) => ({ ...prev, candidateName: e.target.value }))}
+                    placeholder="Full name"
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled={nonRegisteredSending}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">
+                    Candidate Email
+                  </label>
+                  <input
+                    type="email"
+                    value={nonRegisteredForm.candidateEmail}
+                    onChange={(e) => setNonRegisteredForm((prev) => ({ ...prev, candidateEmail: e.target.value }))}
+                    placeholder="candidate@example.com"
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled={nonRegisteredSending}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">
+                    Phone (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={nonRegisteredForm.candidatePhone}
+                    onChange={(e) => setNonRegisteredForm((prev) => ({ ...prev, candidatePhone: e.target.value }))}
+                    placeholder="e.g. +254..."
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled={nonRegisteredSending}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">
+                    Location (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={nonRegisteredForm.candidateLocation}
+                    onChange={(e) => setNonRegisteredForm((prev) => ({ ...prev, candidateLocation: e.target.value }))}
+                    placeholder="Current location"
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled={nonRegisteredSending}
+                  />
+                </div>
+              </div>
+
+              {jobsLoading && (
+                <div className="flex items-center gap-2 text-xs text-slate-500 font-semibold">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading open positions...
+                </div>
+              )}
+
+              {nonRegisteredError && (
+                <div className="flex items-center gap-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  {nonRegisteredError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={closeNonRegisteredModal}
+                  disabled={nonRegisteredSending}
+                  className="px-4 py-2 text-xs font-bold rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={nonRegisteredSending || jobsLoading}
+                  className="px-4 py-2 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 flex items-center gap-2"
+                >
+                  {nonRegisteredSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                  Create And Send Access Code
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
