@@ -54,7 +54,7 @@ export const AppShell: React.FC = () => {
   | null;
 
 
-  const { isAuthenticated, pendingJobId, clearPendingJobId } = useAuth();
+  const { isAuthenticated, role, pendingJobId, clearPendingJobId } = useAuth();
 
   const initialHash = parseHash();
   const [activeTab, setActiveTab] = useState(
@@ -152,7 +152,11 @@ export const AppShell: React.FC = () => {
         const job = await fetchJobById(id);
         if (job) {
           setSelectedJob(job);
-          setActiveTab(tab);
+          if (tab === 'apply' && (!isAuthenticated || role !== 'candidate')) {
+            setActiveTab('job_detail');
+          } else {
+            setActiveTab(tab);
+          }
         } else {
           setActiveTab('job_board');
         }

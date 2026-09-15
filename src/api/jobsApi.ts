@@ -55,3 +55,31 @@ export async function deleteJob(id: string): Promise<void> {
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to delete job');
 }
+
+export async function sendCustomEmailToJobApplicants(
+  jobId: string,
+  payload: { subject: string; message: string }
+): Promise<{
+  totalRecipients: number;
+  deliveredCount: number;
+  failedCount: number;
+  lastCustomEmail: {
+    sentAt: string;
+    subject: string;
+    messagePreview: string;
+  };
+}> {
+  const res = await apiFetch(`/jobs/${jobId}/custom-email`, {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to send custom job email');
+  return {
+    totalRecipients: Number(data.totalRecipients || 0),
+    deliveredCount: Number(data.deliveredCount || 0),
+    failedCount: Number(data.failedCount || 0),
+    lastCustomEmail: data.lastCustomEmail
+  };
+}
