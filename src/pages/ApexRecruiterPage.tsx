@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ApexQuestion, ApexExam, ApexInterviewProduct, ApexCourse, ApexCourseModule, ApexPackage, PaystackPayment, AiInterviewSession, ApexCertificate } from '../types';
 import PackageInstructionsModal from '../components/PackageInstructionsModal';
 import { NotesRichEditor } from '../components/NotesRichEditor';
+import { listQuestionImports, getQuestionImportQuestions } from '../api/apexAssessmentApi';
 import { toEditableNotesHtml, getTocHeadings } from '../utils/moduleNotesFormat';
 import {
   getApexExams,
@@ -57,7 +58,8 @@ import {
   FileDown,
   Download,
   Link2,
-  HelpCircle
+  HelpCircle,
+  Upload
 } from 'lucide-react';
 
 type Tab = 'exams' | 'courses' | 'packages' | 'interview_products' | 'questions' | 'financials' | 'certificates' | 'transcripts';
@@ -80,11 +82,20 @@ export const ApexRecruiterPage: React.FC = () => {
   const [editingExam, setEditingExam] = useState<ApexExam | null>(null);
   const [managingQuestionsForExam, setManagingQuestionsForExam] = useState<ApexExam | null>(null);
   const [showNewExamBuilder, setShowNewExamBuilder] = useState(false);
+  const [csvEditingExam, setCsvEditingExam] = useState<ApexExam | null>(null);
+  const [csvEditQuestions, setCsvEditQuestions] = useState<ApexQuestion[]>([]);
+  const [csvEditSelectedIds, setCsvEditSelectedIds] = useState<Set<string>>(new Set());
+  const [csvEditUploading, setCsvEditUploading] = useState(false);
+  const [csvEditSaving, setCsvEditSaving] = useState(false);
+  const [csvEditError, setCsvEditError] = useState('');
+  const [csvEditShowSavedPicker, setCsvEditShowSavedPicker] = useState(false);
 
   // Courses
   const [courses, setCourses] = useState<ApexCourse[]>([]);
   const [editingCourse, setEditingCourse] = useState<ApexCourse | null>(null);
   const [managingModulesForCourse, setManagingModulesForCourse] = useState<ApexCourse | null>(null);
+  const [questionPoolImportFilter, setQuestionPoolImportFilter] = useState('');
+  const [savedQuestionImports, setSavedQuestionImports] = useState<{ id: string; fileName: string; questionCount: number }[]>([]);
   const [editingModule, setEditingModule] = useState<ApexCourseModule | null>(null);
   const [quizDraft, setQuizDraft] = useState({ question: '', options: ['', '', '', ''], correctIndex: 0 });
   const [generatingAi, setGeneratingAi] = useState(false);
@@ -98,6 +109,8 @@ export const ApexRecruiterPage: React.FC = () => {
   const [packages, setPackages] = useState<ApexPackage[]>([]);
   const [editingPackage, setEditingPackage] = useState<ApexPackage | null>(null);
   const [instructionsPackage, setInstructionsPackage] = useState<ApexPackage | null>(null);
+    const [packageExamSearch, setPackageExamSearch] = useState('');
+  const [packageCourseSearch, setPackageCourseSearch] = useState('');
 
   // Interview Products
   const [products, setProducts] = useState<ApexInterviewProduct[]>([]);
@@ -147,6 +160,10 @@ export const ApexRecruiterPage: React.FC = () => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    listQuestionImports().then(setSavedQuestionImports).catch(() => {});
+  }, []);
+
   const loadData = async () => {
     setExams(await getApexExams());
     setCourses(await getApexCourses());
@@ -184,6 +201,87 @@ export const ApexRecruiterPage: React.FC = () => {
     if (confirm('Delete this exam? Its questions will remain but become unassigned.')) {
       await deleteApexExam(id);
       loadData();
+    }
+  };
+
+  // ── CSV-driven exam question editor (separate from the manual Manage Question Pool panel) ──
+  const openCsvQuestionEditor = (ex: ApexExam) => {
+    setCsvEditingExam(ex);
+    setCsvEditQuestions([]);
+    setCsvEditSelectedIds(new Set());
+    setCsvEditError('');
+    setCsvEditShowSavedPicker(false);
+  };
+
+  const loadCsvEditQuestions = (loaded: ApexQuestion[], examId: string) => {
+    const sorted = [...loaded].sort((a, b) => {
+      const aTop = a.examId === examId ? 0 : 1;
+      const bTop = b.examId === examId ? 0 : 1;
+      return aTop - bTop;
+    });
+    setCsvEditQuestions(sorted);
+    setCsvEditSelectedIds(new Set(sorted.filter((q) => q.examId === examId).map((q) => q.id)));
+  };
+
+  const handleCsvEditUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !csvEditingExam) return;
+    setCsvEditUploading(true);
+    setCsvEditError('');
+    try {
+      const result = await uploadApexQuestionsCsv(file);
+      loadCsvEditQuestions(result.insertedQuestions, csvEditingExam.id);
+      listQuestionImports().then(setSavedQuestionImports).catch(() => {});
+    } catch (err: any) {
+      setCsvEditError(err.message || 'Failed to upload CSV');
+    } finally {
+      setCsvEditUploading(false);
+    }
+  };
+
+  const handleCsvEditUseSaved = async (importId: string) => {
+    if (!csvEditingExam) return;
+    setCsvEditUploading(true);
+    setCsvEditError('');
+    setCsvEditShowSavedPicker(false);
+    try {
+      const loaded = await getQuestionImportQuestions(importId);
+      loadCsvEditQuestions(loaded, csvEditingExam.id);
+    } catch (err: any) {
+      setCsvEditError(err.message || 'Failed to load saved file');
+    } finally {
+      setCsvEditUploading(false);
+    }
+  };
+
+  const toggleCsvEditQuestion = (id: string) => {
+    setCsvEditSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSaveCsvEditSelections = async () => {
+    if (!csvEditingExam) return;
+    setCsvEditSaving(true);
+    try {
+      await Promise.all(
+        csvEditQuestions.map((q) => {
+          const shouldBeAssigned = csvEditSelectedIds.has(q.id);
+          const isAssigned = q.examId === csvEditingExam.id;
+          if (shouldBeAssigned === isAssigned) return Promise.resolve();
+          return saveApexQuestion({ ...q, examId: shouldBeAssigned ? csvEditingExam.id : null });
+        })
+      );
+      setCsvEditingExam(null);
+      await loadData();
+    } catch (err: any) {
+      setCsvEditError(err.message || 'Failed to save changes');
+    } finally {
+      setCsvEditSaving(false);
     }
   };
 
@@ -836,6 +934,13 @@ export const ApexRecruiterPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2 self-start sm:self-center">
                   <button
+                    onClick={() => openCsvQuestionEditor(ex)}
+                    title="Edit questions via CSV"
+                    className="p-2 text-sky-600 hover:bg-sky-50 rounded-lg cursor-pointer"
+                  >
+                    <Upload className="h-4 w-4" />
+                  </button>
+                  <button
                     onClick={() => setManagingQuestionsForExam(ex)}
                     title="Manage question pool"
                     className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg cursor-pointer"
@@ -867,11 +972,36 @@ export const ApexRecruiterPage: React.FC = () => {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-500">
                 {questions.filter((q) => q.examId === managingQuestionsForExam.id).length} attached · check a question to attach it here, uncheck to return it to the bank.
               </p>
+              {savedQuestionImports.length > 0 && (
+                <select
+                  value={questionPoolImportFilter}
+                  onChange={(e) => setQuestionPoolImportFilter(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900"
+                >
+                  <option value="">Filter by CSV file — all questions</option>
+                  {savedQuestionImports.map((imp) => (
+                    <option key={imp.id} value={imp.id}>{imp.fileName} ({imp.questionCount})</option>
+                  ))}
+                </select>
+              )}
+              {savedQuestionImports.length > 0 && (
+                <select
+                  value={questionPoolImportFilter}
+                  onChange={(e) => setQuestionPoolImportFilter(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                >
+                  <option value="">Filter by CSV file — all questions</option>
+                  {savedQuestionImports.map((imp) => (
+                    <option key={imp.id} value={imp.id}>{imp.fileName} ({imp.questionCount})</option>
+                  ))}
+                </select>
+              )}
               <div className="max-h-96 overflow-y-auto space-y-2 pr-1">
                 {[...questions]
+                  .filter((q) => !questionPoolImportFilter || (q as any).sourceImportId === questionPoolImportFilter)
                   .sort((a, b) => {
                     const aTop = a.examId === managingQuestionsForExam.id ? 0 : 1;
                     const bTop = b.examId === managingQuestionsForExam.id ? 0 : 1;
@@ -912,6 +1042,111 @@ export const ApexRecruiterPage: React.FC = () => {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {csvEditingExam && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900">Edit Questions {csvEditingExam.name}</h3>
+                <p className="text-xs text-slate-500">Import a CSV/Excel file or reuse a saved one, then tick which questions belong to this exam.</p>
+              </div>
+              <button type="button" onClick={() => setCsvEditingExam(null)} className="p-1 text-slate-400 hover:text-slate-900 cursor-pointer">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3 flex-wrap">
+              <label className="px-3 py-2 text-[10px] font-bold text-indigo-700 bg-white border border-indigo-300 rounded-lg hover:bg-indigo-100 cursor-pointer whitespace-nowrap flex items-center gap-1.5">
+                <Upload className="h-3.5 w-3.5" />
+                {csvEditUploading ? 'Loading…' : 'Upload CSV / Excel File'}
+                <input type="file" accept=".csv,.xlsx,.xls" onChange={handleCsvEditUpload} disabled={csvEditUploading} className="hidden" />
+              </label>
+              {savedQuestionImports.length > 0 && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setCsvEditShowSavedPicker((v) => !v)}
+                    disabled={csvEditUploading}
+                    className="px-3 py-2 text-[10px] font-bold text-indigo-700 bg-white border border-indigo-300 rounded-lg hover:bg-indigo-100 cursor-pointer whitespace-nowrap"
+                  >
+                    Use a Saved File
+                  </button>
+                  {csvEditShowSavedPicker && (
+                    <div className="absolute z-10 mt-1 w-64 max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg">
+                      {savedQuestionImports.map((imp) => (
+                        <button
+                          key={imp.id}
+                          type="button"
+                          onClick={() => handleCsvEditUseSaved(imp.id)}
+                          className="block w-full text-left px-3 py-2 text-[11px] text-slate-700 hover:bg-slate-50 cursor-pointer"
+                        >
+                          {imp.fileName} <span className="text-slate-400">({imp.questionCount} questions)</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {csvEditQuestions.length > 0 && (
+                <span className="text-xs font-bold text-emerald-600 ml-auto">{csvEditSelectedIds.size} selected</span>
+              )}
+              {csvEditError && <p className="w-full text-[11px] font-semibold text-rose-600">{csvEditError}</p>}
+            </div>
+
+            <div className="p-6 space-y-2 overflow-y-auto flex-1">
+              {csvEditQuestions.length === 0 && !csvEditUploading && (
+                <p className="text-center py-8 text-slate-400 text-xs">Upload a CSV or pick a saved file to see its questions here.</p>
+              )}
+              {csvEditQuestions.map((q) => {
+                const checked = csvEditSelectedIds.has(q.id);
+                const currentlyOnThisExam = q.examId === csvEditingExam.id;
+                return (
+                  <label
+                    key={q.id}
+                    className={`block p-3.5 rounded-2xl border cursor-pointer transition ${
+                      checked ? 'border-emerald-400 bg-emerald-50/60' : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <input type="checkbox" checked={checked} onChange={() => toggleCsvEditQuestion(q.id)} className="mt-1 h-4 w-4 accent-emerald-600" />
+                      <div className="flex-1 space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {q.category && (
+                            <span className="text-[10px] font-extrabold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">{q.category}</span>
+                          )}
+                          {currentlyOnThisExam && (
+                            <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">Currently on this exam</span>
+                          )}
+                        </div>
+                        <p className="text-xs font-bold text-slate-900">{q.question}</p>
+                      </div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setCsvEditingExam(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCsvEditSelections}
+                disabled={csvEditSaving || csvEditQuestions.length === 0}
+                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black text-xs rounded-xl cursor-pointer"
+              >
+                {csvEditSaving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1163,38 +1398,7 @@ export const ApexRecruiterPage: React.FC = () => {
                   <div>
                     <label className="block text-xs font-bold text-slate-300 mb-1">Notes (supports many paragraphs)</label>
                     <p className="text-[10px] text-slate-400 mb-1.5">
-                      Type or paste your notes — bold, italic, underline and color all work. Paste straight from the PDF: each
-                      paragraph keeps the exact spacing it had in the source, no manual clean-up needed. To add an entry to the
-                      candidate's Table of Contents, put the cursor on that line and click <strong>Subtitle</strong>.
-                    </p>
-                    <NotesRichEditor
-                      value={editingModule.contentBody || ''}
-                      onChange={(html) => setEditingModule({ ...editingModule, contentBody: html })}
-                      placeholder="Write or paste the module notes here..."
-                    />
-                    {(() => {
-                      const headings = getTocHeadings(editingModule.contentBody || '');
-                      return headings.length > 0 ? (
-                        <div className="mt-2 p-2.5 bg-slate-900 border border-slate-800 rounded-xl">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Table of Contents Preview</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {headings.map((h, i) => (
-                              <span key={i} className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-[10px] text-indigo-300">
-                                {h}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-[10px] text-amber-500 mt-1.5">
-                          No subtitles yet — select a line and click "Subtitle" to add one to the candidate's Table of Contents.
-                        </p>
-                      );
-                    })()}
-                  </div>                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1">Notes (supports many paragraphs)</label>
-                    <p className="text-[10px] text-slate-400 mb-1.5">
-                      Type or paste your notes — bold, italic, underline and color all work. Paste straight from the PDF: each
+                      Type or paste your notes bold, italic, underline and color all work. Paste straight from the PDF: each
                       paragraph keeps the exact spacing it had in the source, no manual clean-up needed. To add an entry to the
                       candidate's Table of Contents, put the cursor on that line and click <strong>Subtitle</strong>.
                     </p>
@@ -1508,8 +1712,28 @@ export const ApexRecruiterPage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Exams (select all that apply)</label>
+                  <div className="relative mb-1.5">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      value={packageExamSearch}
+                      onChange={(e) => setPackageExamSearch(e.target.value)}
+                      placeholder="Search exams by name or keyword..."
+                      className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400"
+                    />
+                  </div>
                   <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1 bg-slate-50">
-                    {exams.map((ex) => (
+                    {exams
+                      .filter((ex) => {
+                        const q = packageExamSearch.trim().toLowerCase();
+                        if (!q) return true;
+                        return (
+                          ex.name.toLowerCase().includes(q) ||
+                          ex.jobTitle.toLowerCase().includes(q) ||
+                          (ex.category || '').toLowerCase().includes(q)
+                        );
+                      })
+                      .map((ex) => (
                       <label key={ex.id} className="flex items-center gap-2 text-xs text-slate-700 px-1 py-1 cursor-pointer">
                         <input
                           type="checkbox"
@@ -1523,12 +1747,35 @@ export const ApexRecruiterPage: React.FC = () => {
                         {ex.name} — KSh {ex.costKsh.toLocaleString()}
                       </label>
                     ))}
+                    {exams.length > 0 && exams.filter((ex) => {
+                      const q = packageExamSearch.trim().toLowerCase();
+                      if (!q) return true;
+                      return ex.name.toLowerCase().includes(q) || ex.jobTitle.toLowerCase().includes(q) || (ex.category || '').toLowerCase().includes(q);
+                    }).length === 0 && (
+                      <p className="text-[11px] text-slate-400 text-center py-2">No exams match "{packageExamSearch}".</p>
+                    )}
                   </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Courses (select all that apply)</label>
+                  <div className="relative mb-1.5">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      value={packageCourseSearch}
+                      onChange={(e) => setPackageCourseSearch(e.target.value)}
+                      placeholder="Search courses by name or keyword..."
+                      className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400"
+                    />
+                  </div>
                   <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1 bg-slate-50">
-                    {courses.map((c) => (
+                    {courses
+                      .filter((c) => {
+                        const q = packageCourseSearch.trim().toLowerCase();
+                        if (!q) return true;
+                        return c.name.toLowerCase().includes(q) || (c.category || '').toLowerCase().includes(q);
+                      })
+                      .map((c) => (
                       <label key={c.id} className="flex items-center gap-2 text-xs text-slate-700 px-1 py-1 cursor-pointer">
                         <input
                           type="checkbox"
@@ -1542,6 +1789,13 @@ export const ApexRecruiterPage: React.FC = () => {
                         {c.name}
                       </label>
                     ))}
+                    {courses.length > 0 && courses.filter((c) => {
+                      const q = packageCourseSearch.trim().toLowerCase();
+                      if (!q) return true;
+                      return c.name.toLowerCase().includes(q) || (c.category || '').toLowerCase().includes(q);
+                    }).length === 0 && (
+                      <p className="text-[11px] text-slate-400 text-center py-2">No courses match "{packageCourseSearch}".</p>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

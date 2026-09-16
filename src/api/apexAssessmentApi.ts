@@ -206,6 +206,25 @@ export const uploadApexQuestionsCsv = async (file: File, examId?: string | null)
   return data;
 };
 
+
+export interface SavedQuestionImport {
+  id: string;
+  fileName: string;
+  questionCount: number;
+  createdAt: string;
+}
+
+export const listQuestionImports = async (): Promise<SavedQuestionImport[]> => {
+  const res = await apiFetch('/apex/question-imports');
+  if (!res.ok) throw new Error('Failed to load saved CSV files');
+  return res.json();
+};
+
+export const getQuestionImportQuestions = async (importId: string): Promise<ApexQuestion[]> => {
+  const res = await apiFetch(`/apex/question-imports/${importId}/questions`);
+  if (!res.ok) throw new Error('Failed to load questions from saved file');
+  return res.json();
+};
 // Payments (recordPaystackPayment intentionally omitted — legacy, no longer called by any frontend flow)
 export const getPaystackPayments = async (): Promise<PaystackPayment[]> => {
   const res = await apiFetch('/apex/paystack/history');

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ApexExam, ApexQuestion } from '../types';
-import { saveApexExam, saveApexQuestion, uploadApexQuestionsCsv } from '../api/apexAssessmentApi';
+import { saveApexExam, saveApexQuestion, uploadApexQuestionsCsv, listQuestionImports, getQuestionImportQuestions, SavedQuestionImport } from '../api/apexAssessmentApi';
 import {
   ArrowLeft,
   Save,
@@ -67,6 +67,28 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
   const [showImportedPool, setShowImportedPool] = useState(false);
   const [uploadingCsv, setUploadingCsv] = useState(false);
   const [csvImportError, setCsvImportError] = useState('');
+  const [savedImports, setSavedImports] = useState<SavedQuestionImport[]>([]);
+  const [showSavedPicker, setShowSavedPicker] = useState(false);
+  const [loadingSavedImport, setLoadingSavedImport] = useState(false);
+
+  React.useEffect(() => {
+    listQuestionImports().then(setSavedImports).catch(() => {});
+  }, []);
+
+  const handleUseSavedImport = async (imp: SavedQuestionImport) => {
+    setLoadingSavedImport(true);
+    setShowSavedPicker(false);
+    try {
+      const qs = await getQuestionImportQuestions(imp.id);
+      setImportedQuestions((prev) => [...prev, ...qs.filter((q) => !prev.some((p) => p.id === q.id))]);
+      setLastImportBatch(qs);
+      setShowImportedPool(true);
+    } catch (err: any) {
+      setCsvImportError(err.message || 'Failed to load saved file');
+    } finally {
+      setLoadingSavedImport(false);
+    }
+  };
 
   const allQuestions = useMemo(() => {
     const extra = importedQuestions.filter((iq) => !questions.some((q) => q.id === iq.id));
@@ -145,6 +167,7 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
       setImportedQuestions((prev) => [...prev, ...result.insertedQuestions]);
       setLastImportBatch(result.insertedQuestions);
       setShowImportedPool(true);
+      listQuestionImports().then(setSavedImports).catch(() => {});
     } catch (err: any) {
       setCsvImportError(err.message || 'Failed to import CSV');
     } finally {
@@ -541,6 +564,32 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
                 View Imported ({importedQuestions.length})
               </button>
             )}
+            {savedImports.length > 0 && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowSavedPicker((v) => !v)}
+                  disabled={loadingSavedImport}
+                  className="px-3 py-2 text-[10px] font-bold text-indigo-700 bg-white border border-indigo-300 rounded-lg hover:bg-indigo-100 cursor-pointer whitespace-nowrap"
+                >
+                  {loadingSavedImport ? 'Loading…' : 'Use a Saved File'}
+                </button>
+                {showSavedPicker && (
+                  <div className="absolute z-10 mt-1 w-64 max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg">
+                    {savedImports.map((imp) => (
+                      <button
+                        key={imp.id}
+                        type="button"
+                        onClick={() => handleUseSavedImport(imp)}
+                        className="block w-full text-left px-3 py-2 text-[11px] text-slate-700 hover:bg-slate-50 cursor-pointer"
+                      >
+                        {imp.fileName} <span className="text-slate-400">({imp.questionCount} questions)</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <p className="text-[10px] text-indigo-700 basis-full">
               Loads straight into this exam's pool below, unattached — tick the ones you want, same as any other question.
             </p>
@@ -555,6 +604,9 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
                     <h3 className="text-sm font-extrabold text-slate-900">Imported from CSV</h3>
                     <p className="text-xs text-slate-500">
                       {lastImportBatch.length} question{lastImportBatch.length === 1 ? '' : 's'} loaded — tick the ones you want in this exam.
+                    </p>
+                    <p className="text-xs font-bold text-emerald-600 mt-0.5">
+                      {lastImportBatch.filter((q) => selectedIds.has(q.id)).length} selected
                     </p>
                   </div>
                   <button type="button" onClick={() => setShowImportedPool(false)} className="p-1 text-slate-400 hover:text-slate-900 cursor-pointer">

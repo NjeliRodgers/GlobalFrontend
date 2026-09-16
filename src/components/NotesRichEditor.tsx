@@ -15,11 +15,26 @@ const TEXT_COLORS: { label: string; value: string }[] = [
   { label: 'Rose', value: '#fb7185' }
 ];
 
+const FONT_FAMILIES: { label: string; value: string }[] = [
+  { label: 'Default', value: '' },
+  { label: 'Arial', value: 'Arial, sans-serif' },
+  { label: 'Georgia', value: 'Georgia, serif' },
+  { label: 'Times New Roman', value: '"Times New Roman", serif' },
+  { label: 'Courier New', value: '"Courier New", monospace' },
+  { label: 'Verdana', value: 'Verdana, sans-serif' }
+];
+
+const FONT_SIZES: { label: string; value: string }[] = [
+  { label: 'S', value: '2' },   // document.execCommand('fontSize') uses legacy 1-7 scale
+  { label: 'M', value: '3' },
+  { label: 'L', value: '5' },
+  { label: 'XL', value: '7' }
+];
 // Whitelist-based paste sanitizer. Keeps bold/italic/underline/headings/lists/paragraph
 // structure and text color; drops everything else (fonts, sizes, layout junk, scripts)
 // that PDFs/Word tend to bring along. This is what makes a paragraph pasted from a PDF
 // land as its own block, matching the source, instead of needing manual clean-up after.
-const ALLOWED_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'H3', 'P', 'DIV', 'BR', 'UL', 'OL', 'LI', 'SPAN']);
+const ALLOWED_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'H3', 'P', 'DIV', 'BR', 'UL', 'OL', 'LI', 'SPAN', 'FONT']);
 
 function sanitizeNode(node: ChildNode): Node | null {
   if (node.nodeType === Node.TEXT_NODE) return node.cloneNode();
@@ -33,8 +48,11 @@ function sanitizeNode(node: ChildNode): Node | null {
     });
     return frag;
   }
-  const clean = document.createElement(el.tagName.toLowerCase());
-  if (el.tagName === 'SPAN' && el.style?.color) clean.style.color = el.style.color;
+  const clean = document.createElement(el.tagName === 'FONT' ? 'span' : el.tagName.toLowerCase());
+  if ((el.tagName === 'SPAN' || el.tagName === 'FONT') && el.style?.color) clean.style.color = el.style.color;
+  if ((el.tagName === 'SPAN' || el.tagName === 'FONT') && el.style?.fontFamily) clean.style.fontFamily = el.style.fontFamily;
+  if ((el.tagName === 'SPAN' || el.tagName === 'FONT') && el.style?.fontSize) clean.style.fontSize = el.style.fontSize;
+  if (el.tagName === 'FONT' && el.getAttribute('face')) clean.style.fontFamily = el.getAttribute('face') || '';
   el.childNodes.forEach((child) => {
     const cleaned = sanitizeNode(child);
     if (cleaned) clean.appendChild(cleaned);
@@ -62,6 +80,14 @@ function htmlHasBlockStructure(html: string): boolean {
   const wrapper = document.createElement('div');
   wrapper.innerHTML = html;
   return wrapper.querySelectorAll('li, h1, h2, h3, h4, h5, h6, p, div').length > 1;
+}
+
+function plainTextParagraphsToHtml(raw: string): string {
+  const paragraphs = raw
+    .split(/\n\s*\n/)
+    .map((p) => p.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  return paragraphs.map((p) => `<div>${escapeHtml(p)}</div>`).join('');
 }
 
 function plainTextToNotesHtml(raw: string): string {
@@ -139,6 +165,8 @@ export const NotesRichEditor: React.FC<NotesRichEditorProps> = ({ value, onChang
       document.execCommand('insertHTML', false, sanitizeHtml(html));
     } else if (BULLET_PATTERN.test(text)) {
       document.execCommand('insertHTML', false, plainTextToNotesHtml(text));
+    } else if (/\n\s*\n/.test(text)) {
+      document.execCommand('insertHTML', false, plainTextParagraphsToHtml(text));
     } else if (html) {
       document.execCommand('insertHTML', false, sanitizeHtml(html));
     } else {
@@ -158,9 +186,34 @@ export const NotesRichEditor: React.FC<NotesRichEditorProps> = ({ value, onChang
         <button type="button" title="Italic" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('italic')} className="p-1.5 rounded-md text-slate-300 hover:bg-slate-800 hover:text-white cursor-pointer">
           <Italic className="h-3.5 w-3.5" />
         </button>
-        <button type="button" title="Underline" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('underline')} className="p-1.5 rounded-md text-slate-300 hover:bg-slate-800 hover:text-white cursor-pointer">
+              <button type="button" title="Underline" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('underline')} className="p-1.5 rounded-md text-slate-300 hover:bg-slate-800 hover:text-white cursor-pointer">
           <Underline className="h-3.5 w-3.5" />
         </button>
+        <div className="w-px h-4 bg-slate-800 mx-1" />
+        <select
+          title="Font"
+          onMouseDown={(e) => e.stopPropagation()}
+          onChange={(e) => { if (e.target.value) exec('fontName', e.target.value); e.target.value = ''; }}
+          defaultValue=""
+          className="text-[10px] bg-slate-900 text-slate-300 border border-slate-800 rounded-md px-1 py-1 cursor-pointer"
+        >
+          <option value="" disabled>Font</option>
+          {FONT_FAMILIES.filter((f) => f.value).map((f) => (
+            <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>{f.label}</option>
+          ))}
+        </select>
+        <select
+          title="Font size"
+          onMouseDown={(e) => e.stopPropagation()}
+          onChange={(e) => { if (e.target.value) exec('fontSize', e.target.value); e.target.value = ''; }}
+          defaultValue=""
+          className="text-[10px] bg-slate-900 text-slate-300 border border-slate-800 rounded-md px-1 py-1 cursor-pointer"
+        >
+          <option value="" disabled>Size</option>
+          {FONT_SIZES.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
         <div className="w-px h-4 bg-slate-800 mx-1" />
         <button type="button" title="Subtitle — adds to the candidate's Table of Contents" onMouseDown={(e) => e.preventDefault()} onClick={toggleSubtitle} className="px-2 py-1 rounded-md text-[11px] font-bold text-slate-300 hover:bg-slate-800 hover:text-white cursor-pointer">
           Subtitle
