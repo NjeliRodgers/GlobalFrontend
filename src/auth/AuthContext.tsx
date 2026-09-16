@@ -77,6 +77,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  useEffect(() => {
+    const onSessionExpired = () => {
+      // Ensure local user and token are cleared when the session is invalid.
+      setStoredToken(null);
+      setUser(null);
+    };
+
+    window.addEventListener('session:expired', onSessionExpired);
+    return () => window.removeEventListener('session:expired', onSessionExpired);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const openAuthModal = (jobId?: string) => {
     if (jobId) setPendingJobId(jobId);
     setIsAuthModalOpen(true);

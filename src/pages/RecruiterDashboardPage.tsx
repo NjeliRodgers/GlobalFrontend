@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { Job, Application } from '../types';
-import { fetchJobs, createJob, updateJob, deleteJob } from '../api/jobsApi';
+import { fetchJobs, createJob, updateJob, deleteJob, sendCustomEmailToJobApplicants } from '../api/jobsApi';
 import { fetchApplications } from '../api/applicationsApi';
 import { getApexPackages } from '../api/apexAssessmentApi';
 import { RichTextEditor } from '../components/RichTextEditor';
@@ -19,7 +19,9 @@ import {
   Layers,
   Sparkles,
   Pencil,
-  Trash2
+  Trash2,
+  Mail,
+  Send
 } from 'lucide-react';
 
 interface RecruiterDashboardPageProps {
@@ -31,6 +33,26 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
   onNavigateToPipeline,
   onNavigateToScheduler
 }) => {
+  const DEFAULT_BULK_SUBJECT = 'Important Update On Your {{jobTitle}} Application';
+  const DEFAULT_BULK_MESSAGE =
+    'Dear {{candidateName}},\n\n' +
+    'Congratulations. You have been accepted for the {{jobTitle}} opportunity at {{companyName}}.\n\n' +
+    'We would love to submit your profile to our client immediately. Please contact us urgently on WhatsApp: {{whatsappNumber}}\n' +
+    'Direct link: {{whatsappLink}}\n\n' +
+    'When you message us, include your email ({{candidateEmail}}) and job title ({{jobTitle}}) for faster processing.\n\n' +
+    'Kind regards,\nRecruitment Team\n{{companyName}}';
+
+  const DRAG_FIELDS: Array<{ token: string; label: string }> = [
+    { token: '{{candidateName}}', label: 'Candidate Name' },
+    { token: '{{candidateEmail}}', label: 'Candidate Email' },
+    { token: '{{jobTitle}}', label: 'Job Title' },
+    { token: '{{jobLocation}}', label: 'Job Location' },
+    { token: '{{jobDepartment}}', label: 'Department' },
+    { token: '{{whatsappNumber}}', label: 'WhatsApp Number' },
+    { token: '{{whatsappLink}}', label: 'WhatsApp Link' },
+    { token: '{{companyName}}', label: 'Company Name' }
+  ];
+
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [packages, setPackages] = useState<Array<{ id: string; packageId?: string; name: string; isActive: boolean }>>([]);
@@ -51,6 +73,15 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
   const [newJobError, setNewJobError] = useState('');
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
   const [jobSearchQuery, setJobSearchQuery] = useState('');
+  const [bulkEmailModalJob, setBulkEmailModalJob] = useState<Job | null>(null);
+  const [bulkEmailSubject, setBulkEmailSubject] = useState(DEFAULT_BULK_SUBJECT);
+  const [bulkEmailMessage, setBulkEmailMessage] = useState(DEFAULT_BULK_MESSAGE);
+  const [bulkEmailSending, setBulkEmailSending] = useState(false);
+  const [bulkEmailError, setBulkEmailError] = useState('');
+  const [bulkEmailNotice, setBulkEmailNotice] = useState<{ ok: boolean; message: string } | null>(null);
+  const [activeDropField, setActiveDropField] = useState<'subject' | 'message' | null>(null);
+  const subjectRef = useRef<HTMLInputElement | null>(null);
+  const messageRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -186,6 +217,107 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
     );
   });
 
+  const selectedJobApplicants = useMemo(() => {
+    if (!bulkEmailModalJob) return [];
+    return applications.filter((app) => app.jobId === bulkEmailModalJob.id);
+  }, [applications, bulkEmailModalJob]);
+
+  const insertToken = (field: 'subject' | 'message', token: string) => {
+    if (field === 'subject') {
+      const input = subjectRef.current;
+      if (!input) {
+        setBulkEmailSubject((prev) => `${prev}${token}`);
+        return;
+      }
+      const start = input.selectionStart ?? bulkEmailSubject.length;
+      const end = input.selectionEnd ?? start;
+      const next = `${bulkEmailSubject.slice(0, start)}${token}${bulkEmailSubject.slice(end)}`;
+      setBulkEmailSubject(next);
+      requestAnimationFrame(() => {
+        input.focus();
+        input.setSelectionRange(start + token.length, start + token.length);
+      });
+      return;
+    }
+
+    const textarea = messageRef.current;
+    if (!textarea) {
+      setBulkEmailMessage((prev) => `${prev}${token}`);
+      return;
+    }
+    const start = textarea.selectionStart ?? bulkEmailMessage.length;
+    const end = textarea.selectionEnd ?? start;
+    const next = `${bulkEmailMessage.slice(0, start)}${token}${bulkEmailMessage.slice(end)}`;
+    setBulkEmailMessage(next);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + token.length, start + token.length);
+    });
+  };
+
+  const handleDragTokenStart = (e: React.DragEvent<HTMLButtonElement>, token: string) => {
+    e.dataTransfer.setData('text/plain', token);
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+
+  const handleDropToken = (field: 'subject' | 'message', e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    setActiveDropField(null);
+    const token = e.dataTransfer.getData('text/plain');
+    if (!token) return;
+    insertToken(field, token);
+  };
+
+  const openBulkEmailModal = (job: Job) => {
+    setBulkEmailModalJob(job);
+    setBulkEmailSubject(DEFAULT_BULK_SUBJECT);
+    setBulkEmailMessage(DEFAULT_BULK_MESSAGE);
+    setBulkEmailError('');
+    setBulkEmailNotice(null);
+    setActiveDropField(null);
+  };
+
+  const closeBulkEmailModal = () => {
+    if (bulkEmailSending) return;
+    setBulkEmailModalJob(null);
+    setBulkEmailError('');
+    setActiveDropField(null);
+  };
+
+  const handleSendBulkCustomEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bulkEmailModalJob) return;
+
+    const subject = bulkEmailSubject.trim();
+    const message = bulkEmailMessage.trim();
+
+    if (!subject || !message) {
+      setBulkEmailError('Subject and message are required before sending.');
+      return;
+    }
+
+    setBulkEmailError('');
+    setBulkEmailSending(true);
+    setBulkEmailNotice(null);
+
+    try {
+      const result = await sendCustomEmailToJobApplicants(bulkEmailModalJob.id, { subject, message });
+      setBulkEmailNotice({
+        ok: result.failedCount === 0,
+        message:
+          result.failedCount === 0
+            ? `Custom email sent to ${result.deliveredCount} candidate(s) for ${bulkEmailModalJob.title}.`
+            : `Sent to ${result.deliveredCount} candidate(s), ${result.failedCount} failed delivery.`
+      });
+      await loadDashboardData();
+      setBulkEmailModalJob(null);
+    } catch (err: any) {
+      setBulkEmailError(err?.message || 'Failed to send custom email to applicants.');
+    } finally {
+      setBulkEmailSending(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Banner */}
@@ -311,6 +443,7 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
                   <th className="p-3">Location & Work Type</th>
                   <th className="p-3">Salary Range</th>
                   <th className="p-3 text-center">Application Count</th>
+                  <th className="p-3">Last Custom Email</th>
                   <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -334,6 +467,17 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
                         <Users className="h-3.5 w-3.5" /> {job.applicationCount}
                       </span>
                     </td>
+                    <td className="p-3 text-slate-600">
+                      {job.lastCustomEmail ? (
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-bold text-slate-800 line-clamp-1">{job.lastCustomEmail.subject}</p>
+                          <p className="text-[10px] text-slate-500 line-clamp-2">{job.lastCustomEmail.messagePreview}</p>
+                          <p className="text-[10px] text-slate-400">{new Date(job.lastCustomEmail.sentAt).toLocaleString()}</p>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 italic">No custom email sent yet</span>
+                      )}
+                    </td>
                     <td className="p-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
@@ -351,6 +495,15 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
                           Delete
                         </button>
                         <button
+                          onClick={() => openBulkEmailModal(job)}
+                          disabled={job.applicationCount <= 0}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg transition cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                          title={job.applicationCount <= 0 ? 'No applicants yet for this job' : 'Compose and send custom email to all applicants'}
+                        >
+                          <Mail className="h-3.5 w-3.5" />
+                          Send Bulk Email
+                        </button>
+                        <button
                           onClick={() => onNavigateToPipeline(job.id)}
                           className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] rounded-lg transition cursor-pointer shadow-2xs"
                         >
@@ -365,6 +518,128 @@ export const RecruiterDashboardPage: React.FC<RecruiterDashboardPageProps> = ({
           </div>
         )}
       </div>
+
+      {bulkEmailNotice && (
+        <div
+          className={`rounded-xl border px-4 py-3 text-xs font-semibold flex items-center gap-2 ${
+            bulkEmailNotice.ok
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-amber-200 bg-amber-50 text-amber-800'
+          }`}
+        >
+          {bulkEmailNotice.ok ? <CheckCircle2 className="h-4 w-4" /> : <Filter className="h-4 w-4" />}
+          {bulkEmailNotice.message}
+        </div>
+      )}
+
+      {bulkEmailModalJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-3xl p-6 relative max-h-[92vh] overflow-y-auto my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div>
+                <h3 className="font-bold text-slate-900 text-lg">Send Custom Email To All Applicants</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {bulkEmailModalJob.title} · {selectedJobApplicants.length} applicant(s)
+                </p>
+              </div>
+              <button
+                onClick={closeBulkEmailModal}
+                disabled={bulkEmailSending}
+                className="p-1.5 text-slate-400 hover:text-slate-600 disabled:opacity-40"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] font-bold text-slate-600 uppercase tracking-wide mb-2">Drag Or Click Fields</p>
+              <div className="flex flex-wrap gap-2">
+                {DRAG_FIELDS.map((field) => (
+                  <button
+                    key={field.token}
+                    type="button"
+                    draggable
+                    onDragStart={(e) => handleDragTokenStart(e, field.token)}
+                    onClick={() => insertToken(activeDropField || 'message', field.token)}
+                    className="px-2.5 py-1.5 rounded-lg border border-indigo-200 bg-white text-indigo-700 text-[11px] font-bold hover:bg-indigo-50 cursor-grab active:cursor-grabbing"
+                  >
+                    {field.label}: {field.token}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={handleSendBulkCustomEmail} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Email Subject</label>
+                <input
+                  ref={subjectRef}
+                  type="text"
+                  value={bulkEmailSubject}
+                  onChange={(e) => setBulkEmailSubject(e.target.value)}
+                  onFocus={() => setActiveDropField('subject')}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setActiveDropField('subject');
+                  }}
+                  onDrop={(e) => handleDropToken('subject', e)}
+                  placeholder="Enter subject"
+                  className={`w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                    activeDropField === 'subject' ? 'border-indigo-400' : 'border-slate-200'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Message</label>
+                <textarea
+                  ref={messageRef}
+                  value={bulkEmailMessage}
+                  onChange={(e) => setBulkEmailMessage(e.target.value)}
+                  onFocus={() => setActiveDropField('message')}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setActiveDropField('message');
+                  }}
+                  onDrop={(e) => handleDropToken('message', e)}
+                  rows={11}
+                  className={`w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                    activeDropField === 'message' ? 'border-indigo-400' : 'border-slate-200'
+                  }`}
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Use placeholders such as {'{{candidateName}}'}, {'{{jobTitle}}'}, and {'{{whatsappLink}}'} to personalize each email.
+                </p>
+              </div>
+
+              {bulkEmailError && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 font-semibold">
+                  {bulkEmailError}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={closeBulkEmailModal}
+                  disabled={bulkEmailSending}
+                  className="px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl transition disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={bulkEmailSending}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {bulkEmailSending ? <Sparkles className="h-3.5 w-3.5 animate-pulse" /> : <Send className="h-3.5 w-3.5" />}
+                  {bulkEmailSending ? 'Sending...' : `Send To ${selectedJobApplicants.length} Applicant(s)`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Post New Job Modal */}
       {isNewJobModalOpen && (

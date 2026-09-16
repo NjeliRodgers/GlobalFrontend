@@ -85,6 +85,39 @@ export async function sendApplicationAccessCodeEmail(applicationId: string): Pro
   };
 }
 
+export async function createCandidateApplicationAndSendAccessCode(payload: {
+  candidateName: string;
+  candidateEmail: string;
+  candidatePhone?: string;
+  candidateLocation?: string;
+  jobId: string;
+}): Promise<{
+  delivered: boolean;
+  voucher: { code: string; redeemedAt: string | null; issuedAt: string | null };
+  packageRefs: string[];
+  candidateCreated: boolean;
+  applicationCreated: boolean;
+  application: { id: string; jobId: string; jobTitle: string; candidateEmail: string };
+}> {
+  const res = await apiFetch('/applications/send-access-code/non-registered', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to create candidate application and send access code email');
+
+  return {
+    delivered: !!data.delivered,
+    voucher: data.voucher,
+    packageRefs: data.packageRefs || [],
+    candidateCreated: !!data.candidateCreated,
+    applicationCreated: !!data.applicationCreated,
+    application: data.application
+  };
+}
+
 export async function fetchApplicationReadiness(applicationId: string): Promise<{
   application: Application;
   readinessProgress: ReadinessProgress;
