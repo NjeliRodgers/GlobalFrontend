@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 260">
+  <rect width="720" height="260" fill="#0F2438"/>
+  <g transform="translate(60,50)">
+    <circle cx="60" cy="56" r="52" fill="none" stroke="#D8B27C" stroke-width="17"/>
+  </g>
+  <text x="150" y="150" font-family="Georgia, 'Times New Roman', serif" font-size="72" fill="#D8B27C">Global Talent</text>
+  <g transform="translate(608,86)" stroke="#33C7C2" stroke-width="14" stroke-linecap="round">
+    <line x1="0" y1="-26" x2="0" y2="26"/>
+    <line x1="-26" y1="0" x2="26" y2="0"/>
+  </g>
+</svg>
