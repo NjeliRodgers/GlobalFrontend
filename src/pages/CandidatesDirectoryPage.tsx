@@ -41,6 +41,8 @@ const EMPTY_ANALYTICS: CandidatesDirectoryAnalytics = {
   paidCandidatesInPeriod: 0,
   paymentTransactionsInPeriod: 0,
   totalCashCollectedKsh: 0,
+  manualPaymentTransactionsInPeriod: 0,
+  manualCashCollectedKsh: 0,
   firstPaymentAt: null,
   lastPaymentAt: null,
   dailyCollections: [],
@@ -542,6 +544,15 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
           </div>
           <div className="text-2xl font-black text-sky-700 mt-1">{periodAnalytics.registrationsInPeriod}</div>
           <p className="text-[10px] text-slate-500 mt-0.5">Atesta registrations: {periodAnalytics.atestaRegistrationsInPeriod}</p>
+        </div>
+
+        <div className="bg-amber-50 rounded-2xl border border-amber-200 p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-amber-800">Manual Recorded Payments</span>
+            <HandCoins className="h-4 w-4 text-amber-700" />
+          </div>
+          <div className="text-2xl font-black text-amber-800 mt-1">{formatCurrency(periodAnalytics.manualCashCollectedKsh)}</div>
+          <p className="text-[10px] text-amber-700 mt-0.5">{periodAnalytics.manualPaymentTransactionsInPeriod} transaction(s) in selected period</p>
         </div>
       </div>
 

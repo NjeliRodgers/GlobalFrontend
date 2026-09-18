@@ -154,6 +154,8 @@ export interface CandidatesDirectoryAnalytics {
   paidCandidatesInPeriod: number;
   paymentTransactionsInPeriod: number;
   totalCashCollectedKsh: number;
+  manualPaymentTransactionsInPeriod: number;
+  manualCashCollectedKsh: number;
   firstPaymentAt: string | null;
   lastPaymentAt: string | null;
   dailyCollections: Array<{
