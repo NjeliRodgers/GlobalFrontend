@@ -33,7 +33,9 @@ import {
 } from '../api/supportApi';
 import {
   createCandidateApplicationAndSendAccessCode,
-  sendApplicationAccessCodeEmail
+  sendApplicationAccessCodeEmail,
+  sendApplicationReviewEmail,
+  sendApplicationAcceptanceEmail
 } from '../api/applicationsApi';
 import { fetchJobs } from '../api/jobsApi';
 
@@ -92,6 +94,8 @@ export const CandidateControlPanelPage: React.FC = () => {
   const [codeCopied, setCodeCopied] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [manualEmailKind, setManualEmailKind] = useState<'review' | 'acceptance' | null>(null);
+  const [manualEmailResult, setManualEmailResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [panelNotice, setPanelNotice] = useState<{ ok: boolean; message: string } | null>(null);
   const [showNonRegisteredModal, setShowNonRegisteredModal] = useState(false);
   const [nonRegisteredSending, setNonRegisteredSending] = useState(false);
@@ -149,6 +153,29 @@ export const CandidateControlPanelPage: React.FC = () => {
       setSendResult({ ok: false, message: err.message || 'Failed to send access-code email.' });
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleSendManualEmail = async (kind: 'review' | 'acceptance') => {
+    if (!profile || !activeApplication) return;
+    setManualEmailKind(kind);
+    setManualEmailResult(null);
+    try {
+      const result = kind === 'review'
+        ? await sendApplicationReviewEmail(activeApplication.id)
+        : await sendApplicationAcceptanceEmail(activeApplication.id);
+      setManualEmailResult({
+        ok: result.delivered,
+        message: result.delivered
+          ? `${kind === 'review' ? 'Review summary' : 'Acceptance update'} sent to ${profile.candidate.email}.`
+          : 'Send attempted but delivery was not confirmed.'
+      });
+      const refreshed = await fetchCandidateSupportProfile(profile.candidate.email);
+      setProfile(refreshed);
+    } catch (err: any) {
+      setManualEmailResult({ ok: false, message: err.message || 'Failed to send application email.' });
+    } finally {
+      setManualEmailKind(null);
     }
   };
 
@@ -656,6 +683,24 @@ export const CandidateControlPanelPage: React.FC = () => {
               </button>
 
               <button
+                onClick={() => void handleSendManualEmail('review')}
+                disabled={manualEmailKind !== null || !activeApplication}
+                className="px-5 py-2.5 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm transition cursor-pointer flex items-center gap-2"
+              >
+                <Mail className="h-4 w-4" />
+                {manualEmailKind === 'review' ? 'Sending Review...' : 'Send Review Summary'}
+              </button>
+
+              <button
+                onClick={() => void handleSendManualEmail('acceptance')}
+                disabled={manualEmailKind !== null || !activeApplication}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm transition cursor-pointer flex items-center gap-2"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                {manualEmailKind === 'acceptance' ? 'Sending Acceptance...' : 'Send Acceptance Update'}
+              </button>
+
+              <button
                 disabled
                 title="WhatsApp sending is coming in a future update"
                 className="px-5 py-2.5 bg-slate-100 text-slate-400 font-bold text-xs rounded-xl cursor-not-allowed flex items-center gap-2"
@@ -676,6 +721,12 @@ export const CandidateControlPanelPage: React.FC = () => {
               >
                 {sendResult.ok ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
                 {sendResult.message}
+              </div>
+            )}
+            {manualEmailResult && (
+              <div className={`flex items-center gap-2 text-xs font-semibold rounded-lg px-3 py-2 border ${manualEmailResult.ok ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-rose-700 bg-rose-50 border-rose-200'}`}>
+                {manualEmailResult.ok ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
+                {manualEmailResult.message}
               </div>
             )}
           </div>
