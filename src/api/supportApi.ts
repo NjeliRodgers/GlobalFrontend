@@ -17,6 +17,18 @@ export interface SupportAssignedPackage {
   name: string;
   packageId: string;
   costKsh: number | null;
+  courses: SupportAssignedPackageItem[];
+  exams: SupportAssignedPackageItem[];
+}
+
+export interface SupportAssignedPackageItem {
+  id: string;
+  name: string;
+  costKsh: number | null;
+  needsPayment: boolean;
+  enrollmentStatus: string | null;
+  isPaid: boolean;
+  paymentRef: string | null;
 }
 
 export interface SupportApplication {
@@ -61,4 +73,25 @@ export async function sendCandidateSupportEmail(
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to send support email.');
   return data;
+}
+
+export async function assumeSupportItemPaid(payload: {
+  applicationId: string;
+  packageRef: string;
+  itemType: 'course' | 'exam';
+  itemId: string;
+}): Promise<{ success: boolean; message: string; transactionRef: string | null }> {
+  const res = await apiFetch('/support/candidate/assume-paid', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to mark this item as paid.');
+  return {
+    success: !!data.success,
+    message: String(data.message || 'Payment status updated.'),
+    transactionRef: data.transactionRef || null
+  };
 }
