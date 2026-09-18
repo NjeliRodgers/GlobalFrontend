@@ -235,6 +235,8 @@ const EMPTY_ANALYTICS: CandidatesDirectoryAnalytics = {
   paidCandidatesInPeriod: 0,
   paymentTransactionsInPeriod: 0,
   totalCashCollectedKsh: 0,
+  manualPaymentTransactionsInPeriod: 0,
+  manualCashCollectedKsh: 0,
   firstPaymentAt: null,
   lastPaymentAt: null,
   dailyCollections: [],
