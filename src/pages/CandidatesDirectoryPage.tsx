@@ -5,7 +5,11 @@ import {
   CandidatesDirectoryAnalytics,
   CandidatesDirectoryFilters
 } from '../api/usersApi';
-import { sendApplicationAccessCodeEmail } from '../api/applicationsApi';
+import {
+  sendApplicationAccessCodeEmail,
+  sendApplicationReviewEmail,
+  sendApplicationAcceptanceEmail
+} from '../api/applicationsApi';
 import {
   Search,
   Users,
@@ -89,6 +93,8 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [sendingCodeEmailForAppId, setSendingCodeEmailForAppId] = useState<string | null>(null);
   const [codeEmailStatusByAppId, setCodeEmailStatusByAppId] = useState<Record<string, { ok: boolean; message: string }>>({});
+  const [sendingManualEmail, setSendingManualEmail] = useState<string | null>(null);
+  const [manualEmailStatusByAppId, setManualEmailStatusByAppId] = useState<Record<string, { ok: boolean; message: string }>>({});
 
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -219,6 +225,28 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
       }));
     } finally {
       setSendingCodeEmailForAppId(null);
+    }
+  };
+
+  const handleSendManualApplicationEmail = async (applicationId: string, kind: 'review' | 'acceptance') => {
+    const actionKey = `${kind}:${applicationId}`;
+    setSendingManualEmail(actionKey);
+    setManualEmailStatusByAppId((prev) => ({ ...prev, [applicationId]: { ok: false, message: '' } }));
+    try {
+      const result = kind === 'review'
+        ? await sendApplicationReviewEmail(applicationId)
+        : await sendApplicationAcceptanceEmail(applicationId);
+      setManualEmailStatusByAppId((prev) => ({
+        ...prev,
+        [applicationId]: { ok: result.delivered, message: result.delivered ? 'Email sent instantly.' : 'Email was not delivered.' }
+      }));
+    } catch (err: any) {
+      setManualEmailStatusByAppId((prev) => ({
+        ...prev,
+        [applicationId]: { ok: false, message: err.message || 'Failed to send email.' }
+      }));
+    } finally {
+      setSendingManualEmail(null);
     }
   };
 
@@ -807,6 +835,29 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                                               }`}
                                             >
                                               {codeEmailStatusByAppId[app.applicationId].message}
+                                            </p>
+                                          )}
+                                          <div className="flex flex-wrap gap-1.5 mt-1">
+                                            <button
+                                              type="button"
+                                              onClick={() => void handleSendManualApplicationEmail(app.applicationId, 'review')}
+                                              disabled={sendingManualEmail === `review:${app.applicationId}`}
+                                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[10px] font-bold"
+                                            >
+                                              {sendingManualEmail === `review:${app.applicationId}` ? 'Sending Review...' : 'Send Review Summary'}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => void handleSendManualApplicationEmail(app.applicationId, 'acceptance')}
+                                              disabled={sendingManualEmail === `acceptance:${app.applicationId}`}
+                                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[10px] font-bold"
+                                            >
+                                              {sendingManualEmail === `acceptance:${app.applicationId}` ? 'Sending Acceptance...' : 'Send Acceptance Update'}
+                                            </button>
+                                          </div>
+                                          {manualEmailStatusByAppId[app.applicationId]?.message && (
+                                            <p className={`mt-1 text-[10px] ${manualEmailStatusByAppId[app.applicationId].ok ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                              {manualEmailStatusByAppId[app.applicationId].message}
                                             </p>
                                           )}
                                         </div>

@@ -152,7 +152,7 @@ export const AppShell: React.FC = () => {
         const job = await fetchJobById(id);
         if (job) {
           setSelectedJob(job);
-          if (tab === 'apply' && (!isAuthenticated || role !== 'candidate')) {
+          if (tab === 'apply' && (!isAuthenticated || (role && role !== 'candidate'))) {
             setActiveTab('job_detail');
           } else {
             setActiveTab(tab);
