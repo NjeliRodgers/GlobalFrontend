@@ -39,7 +39,7 @@ export default function PackageInstructionsModal({ pkg, onClose, onSave }: Props
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div>
             <span className="font-extrabold text-sm text-amber-400">Instructions &amp; Guidelines</span>
-            <p className="text-[11px] text-slate-400">{pkg.name} — leave a field blank to keep the default copy</p>
+            <p className="text-[11px] text-slate-400">{pkg.name} </p>
           </div>
           <button type="button" onClick={onClose} className="p-1 text-slate-400 hover:text-white">
             <X className="h-5 w-5" />

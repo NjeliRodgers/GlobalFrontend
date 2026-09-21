@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { PanelsTopLeft } from 'lucide-react';
 import {
   Briefcase,
   Globe,
@@ -32,6 +33,7 @@ const NAV_ITEMS = [
   { tab: 'team_rbac', label: 'RBAC & Team Access Control', icon: ShieldCheck, iconColor: 'text-rose-400' },
   { tab: 'apex_recruiter', label: 'Atesta System Admin Control', icon: Sliders, iconColor: 'text-purple-400' },
   { tab: 'candidate_control_panel', label: 'Candidate Control Panel', icon: LifeBuoy, iconColor: 'text-teal-400' },
+  { tab: 'site_content_admin', label: 'Public Pages Editor', icon: PanelsTopLeft, iconColor: 'text-sky-300', adminOnly: true },
 ];
 
 const CANDIDATE_NAV_ITEMS = [
@@ -51,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
     return null;
   }
 
-  const items = isRecruiterOrAdmin ? NAV_ITEMS : CANDIDATE_NAV_ITEMS;
+  const items = isRecruiterOrAdmin ? NAV_ITEMS.filter((item) => !item.adminOnly || role === 'admin' || role === 'recruiter') : CANDIDATE_NAV_ITEMS;
   const sectionLabel = isRecruiterOrAdmin ? 'Global Talent Plus Operations' : 'My Sponsorship';
   const mobileVisibility = isOpen ? 'translate-x-0' : '-translate-x-full';
 

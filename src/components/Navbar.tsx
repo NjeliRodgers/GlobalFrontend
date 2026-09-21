@@ -21,6 +21,19 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, activeTab, setA
 
   const isRecruiterOrAdmin = role === 'recruiter' || role === 'admin' || role === 'hiring_manager';
 
+  // Links shown to visitors who have not signed in.
+  const publicTabs = [
+    { tab: 'home', label: 'Home' },
+    { tab: 'job_board', label: 'Opportunities' },
+    { tab: 'about', label: 'About Us' },
+  ];
+  const goToPublicTab = (tab: string) => {
+    setActiveTab(tab);
+    window.scrollTo({ top: 0 });
+  };
+  const isPublicTabActive = (tab: string) =>
+    activeTab === tab || (tab === 'job_board' && activeTab === 'job_detail');
+
   const [myApplications, setMyApplications] = useState<Application[]>([]);
 
   useEffect(() => {
@@ -64,7 +77,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, activeTab, setA
         <div className="flex items-center space-x-3">
           <button
             onClick={onToggleSidebar}
-            className="p-2 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200 rounded-xl cursor-pointer flex items-center justify-center"
+            className={`p-2 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200 rounded-xl cursor-pointer items-center justify-center ${
+              isAuthenticated ? 'flex' : 'hidden'
+            }`}
             title="Toggle Sidebar Navigation"
             aria-label="Toggle Sidebar Navigation"
           >
@@ -83,6 +98,25 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, activeTab, setA
             </div>
           </div>
         </div>
+
+        {!isAuthenticated && (
+          <nav className="hidden md:flex items-center space-x-1" aria-label="Main">
+            {publicTabs.map(({ tab, label }) => (
+              <button
+                key={tab}
+                onClick={() => goToPublicTab(tab)}
+                aria-current={isPublicTabActive(tab) ? 'page' : undefined}
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${
+                  isPublicTabActive(tab)
+                    ? 'bg-[#1f4e79]/10 text-[#1f4e79]'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+        )}
 
         {isAuthenticated && (
           <nav className="hidden md:flex items-center space-x-1">
@@ -169,6 +203,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, activeTab, setA
         )}
 
         <div className="flex items-center space-x-3">
+          {!isAuthenticated && activeTab !== 'job_board' && (
+            <button
+              onClick={() => goToPublicTab('job_board')}
+              className="hidden sm:inline-flex px-5 py-2 border border-[#1f4e79] text-[#1f4e79] hover:bg-[#1f4e79]/10 text-xs font-semibold tracking-wide rounded-lg transition cursor-pointer"
+            >
+              View Jobs
+            </button>
+          )}
           {isAuthenticated && user ? (
             <div className="relative" ref={dropdownRef}>
               <button
@@ -270,6 +312,22 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, activeTab, setA
           )}
         </div>
       </div>
+      {!isAuthenticated && (
+        <nav className="md:hidden flex items-center justify-around border-t border-slate-100 px-2 py-1.5" aria-label="Main">
+          {publicTabs.map(({ tab, label }) => (
+            <button
+              key={tab}
+              onClick={() => goToPublicTab(tab)}
+              aria-current={isPublicTabActive(tab) ? 'page' : undefined}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+                isPublicTabActive(tab) ? 'bg-[#1f4e79]/10 text-[#1f4e79]' : 'text-slate-600'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
     </header>
   );
 };

@@ -52,8 +52,8 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
     timeLimitMinutes: 30,
     passMarkPercent: 70,
     examType: 'general',
-    interviewCostKsh: 0,
-    interviewPassMarkPercent: 70
+    interviewCostKsh: null,
+    interviewPassMarkPercent: null
   });
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -103,14 +103,7 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
     });
   };
 
-  // Auto-select questions from the pool that relate to a keyword (e.g. "security"),
-  // matched against the question text and its category. Picks exactly as many
-  // as "Questions per Attempt" asks for. To avoid handing out the exact same
-  // set every time the same keyword is used for a different exam, it favors
-  // questions that aren't attached to any other exam yet, and shuffles the
-  // pool each time — so overlap can happen (especially with a small bank),
-  // but the result isn't identical run to run. The admin can still manually
-  // tick/untick individual questions afterward using the existing checkboxes.
+
   const shuffleQuestions = (arr: ApexQuestion[]): ApexQuestion[] => {
     const copy = [...arr];
     for (let i = copy.length - 1; i > 0; i--) {
@@ -455,21 +448,26 @@ export const NewExamBuilderPage: React.FC<NewExamBuilderPageProps> = ({ question
                   <input
                     type="number"
                     min={0}
-                    value={draft.interviewCostKsh ?? 0}
-                    onChange={(e) => setDraft({ ...draft, interviewCostKsh: Number(e.target.value) })}
-                    placeholder="Leave 0 to keep the interview stage hidden"
+                    value={draft.interviewCostKsh ?? ''}
+                    onChange={(e) =>
+                      setDraft({ ...draft, interviewCostKsh: e.target.value === '' ? null : Number(e.target.value) })
+                    }
+                    placeholder="Optional. Leave empty if this exam is only used inside a package"
                     className={fieldClass}
                   />
-                  <p className={hintClass}>Only unlocks for a candidate once they've passed this exam.</p>
+                  <p className={hintClass}>Optional. Only used when this exam is given on its own, outside a package. Inside a package, the package's Screening Interview section (cost and pass mark) is used instead.</p>
                 </div>
                 <div>
-                  <label className={labelClass}>AI Interview Pass Mark (%)</label>
+                  <label className={labelClass}>Screening Interview Pass Mark (%)</label>
                   <input
                     type="number"
                     min={1}
                     max={100}
-                    value={draft.interviewPassMarkPercent ?? 70}
-                    onChange={(e) => setDraft({ ...draft, interviewPassMarkPercent: Number(e.target.value) })}
+                    value={draft.interviewPassMarkPercent ?? ''}
+                    placeholder="Optional (70 if left empty)"
+                    onChange={(e) =>
+                      setDraft({ ...draft, interviewPassMarkPercent: e.target.value === '' ? null : Number(e.target.value) })
+                    }
                     className={fieldClass}
                   />
                 </div>

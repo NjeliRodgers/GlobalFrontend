@@ -4,6 +4,10 @@ import { Job } from './types';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { AuthModal } from './auth/AuthModal';
+import { HomePage } from './pages/HomePage';
+import { AboutUsPage } from './pages/AboutUsPage';
+import { SiteContentAdminPage } from './pages/SiteContentAdminPage';
+import { PublicFooter } from './components/public/PublicFooter';
 
 import { JobBoardPage } from './pages/JobBoardPage';
 import { SponsorshipProcessPage } from './pages/SponsorshipProcessPage';
@@ -31,7 +35,7 @@ const APPLICATION_SCOPED_TABS = new Set(['import_detail']);
 // The only screens a signed-out visitor may see: the public job board and
 // an individual job's public description page. Everything else — for any
 // role — requires being logged in.
-const PUBLIC_TABS = new Set(['job_board', 'job_detail']);
+const PUBLIC_TABS = new Set(['job_board', 'job_detail', 'home', 'about']);
 
 const parseHash = (): { tab: string; id?: string } => {
   const raw = window.location.hash.replace(/^#\/?/, '');
@@ -105,6 +109,11 @@ export const AppShell: React.FC = () => {
   useEffect(() => {
     const wasAuthenticated = wasAuthenticatedRef.current;
     wasAuthenticatedRef.current = isAuthenticated;
+
+    if (!wasAuthenticated && isAuthenticated && (activeTab === 'home' || activeTab === 'about')) {
+      setActiveTab('job_board');
+      return;
+    }
 
     if (wasAuthenticated && !isAuthenticated) {
       setActiveTab('job_board');
@@ -219,6 +228,11 @@ export const AppShell: React.FC = () => {
     }
   }, [isAuthenticated, pendingJobId]);
 
+  const goToPublicTab = (tab: string) => {
+    setActiveTab(tab);
+    window.scrollTo({ top: 0 });
+  };
+
   const handleSelectJobForDetails = (job: Job) => {
     setSelectedJob(job);
     setActiveTab('job_detail');
@@ -279,7 +293,18 @@ export const AppShell: React.FC = () => {
           />
         )}
 
-        <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 min-w-0">
+        <main
+          className={
+            activeTab === 'home' || activeTab === 'about'
+              ? 'flex-1 w-full min-w-0'
+              : 'flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 min-w-0'
+          }
+        >
+          {activeTab === 'home' && <HomePage onNavigate={goToPublicTab} />}
+
+          {activeTab === 'about' && <AboutUsPage onNavigate={goToPublicTab} />}
+
+          {activeTab === 'site_content_admin' && isAuthenticated && (role === 'admin' || role === 'recruiter') && <SiteContentAdminPage />}
           {activeTab === 'job_board' && (
             <JobBoardPage
               highlightJobId={highlightedJobId}
@@ -362,6 +387,10 @@ export const AppShell: React.FC = () => {
           {activeTab === 'candidates_directory' && isAuthenticated && <CandidatesDirectoryPage />}
         </main>
       </div>
+
+      {(!isAuthenticated || activeTab === 'home' || activeTab === 'about') && (
+        <PublicFooter onNavigate={goToPublicTab} />
+      )}
 
       <AuthModal />
     </div>

@@ -816,25 +816,30 @@ export const ApexRecruiterPage: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-800">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">AI Interview Cost (KSh)</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Screening Interview Cost (KSh)</label>
                   <input
                     type="number"
                     min={0}
-                    value={editingExam.interviewCostKsh ?? 0}
-                    onChange={(e) => setEditingExam({ ...editingExam, interviewCostKsh: Number(e.target.value) })}
-                    placeholder="Leave 0 to keep the interview stage hidden"
+                    value={editingExam.interviewCostKsh ?? ''}
+                    onChange={(e) =>
+                      setEditingExam({ ...editingExam, interviewCostKsh: e.target.value === '' ? null : Number(e.target.value) })
+                    }
+                    placeholder="Optional. Leave empty if this exam is only used inside a package"
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
                   />
-                  <p className="text-[10px] text-slate-500 mt-1">Only unlocks for a candidate once they've passed this exam.</p>
+                  <p className="text-[10px] text-slate-500 mt-1">Optional. Only used when this exam is given on its own, outside a package. Inside a package, the package's Interview screening section (cost and pass mark) is used instead.</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">AI Interview Pass Mark (%)</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Screening Interview Pass Mark (%)</label>
                   <input
                     type="number"
                     min={1}
                     max={100}
-                    value={editingExam.interviewPassMarkPercent ?? 70}
-                    onChange={(e) => setEditingExam({ ...editingExam, interviewPassMarkPercent: Number(e.target.value) })}
+                    value={editingExam.interviewPassMarkPercent ?? ''}
+                    placeholder="Optional (70 if left empty)"
+                    onChange={(e) =>
+                      setEditingExam({ ...editingExam, interviewPassMarkPercent: e.target.value === '' ? null : Number(e.target.value) })
+                    }
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
                   />
                 </div>
