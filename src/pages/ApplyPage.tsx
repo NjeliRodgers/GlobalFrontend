@@ -295,8 +295,14 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
 
       const uploadedDocuments: SubmittedDocument[] = [];
       for (const item of uploads) {
-        const uploaded = await uploadApplicationDocument(item.file, item.fileType);
-        uploadedDocuments.push(uploaded);
+        try {
+          const uploaded = await uploadApplicationDocument(item.file, item.fileType);
+          uploadedDocuments.push(uploaded);
+        } catch (uploadError: any) {
+          throw new Error(
+            `Could not upload your ${item.fileType.replace('_', ' ')} document. ${uploadError.message || 'Please try again.'}`
+          );
+        }
       }
 
       const { application } = await submitApplication({

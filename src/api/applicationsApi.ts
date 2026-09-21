@@ -187,3 +187,23 @@ export async function uploadApplicationReadinessDocument(
   if (!res.ok) throw new Error(data.error || 'Failed to upload document');
   return data;
 }
+
+export async function sendApplicationReviewEmail(applicationId: string): Promise<{ delivered: boolean; emailLog: any }> {
+  const res = await apiFetch(`/applications/${applicationId}/send-review-email`, {
+    method: 'POST',
+    headers: jsonHeaders
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to send application review email');
+  return { delivered: !!data.delivered, emailLog: data.emailLog };
+}
+
+export async function sendApplicationAcceptanceEmail(applicationId: string): Promise<{ delivered: boolean; emailLog: any }> {
+  const res = await apiFetch(`/applications/${applicationId}/send-acceptance-email`, {
+    method: 'POST',
+    headers: jsonHeaders
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to send acceptance email');
+  return { delivered: !!data.delivered, emailLog: data.emailLog };
+}

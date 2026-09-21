@@ -27,12 +27,15 @@ import {
 import { Job } from '../types';
 import {
   fetchCandidateSupportProfile,
+  assumeSupportItemPaid,
   SupportProfile,
   SupportApplication
 } from '../api/supportApi';
 import {
   createCandidateApplicationAndSendAccessCode,
-  sendApplicationAccessCodeEmail
+  sendApplicationAccessCodeEmail,
+  sendApplicationReviewEmail,
+  sendApplicationAcceptanceEmail
 } from '../api/applicationsApi';
 import { fetchJobs } from '../api/jobsApi';
 
@@ -91,10 +94,13 @@ export const CandidateControlPanelPage: React.FC = () => {
   const [codeCopied, setCodeCopied] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [manualEmailKind, setManualEmailKind] = useState<'review' | 'acceptance' | null>(null);
+  const [manualEmailResult, setManualEmailResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [panelNotice, setPanelNotice] = useState<{ ok: boolean; message: string } | null>(null);
   const [showNonRegisteredModal, setShowNonRegisteredModal] = useState(false);
   const [nonRegisteredSending, setNonRegisteredSending] = useState(false);
   const [nonRegisteredError, setNonRegisteredError] = useState('');
+  const [assumingPaidKey, setAssumingPaidKey] = useState<string | null>(null);
   const [jobsLoading, setJobsLoading] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [nonRegisteredForm, setNonRegisteredForm] = useState({
@@ -147,6 +153,29 @@ export const CandidateControlPanelPage: React.FC = () => {
       setSendResult({ ok: false, message: err.message || 'Failed to send access-code email.' });
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleSendManualEmail = async (kind: 'review' | 'acceptance') => {
+    if (!profile || !activeApplication) return;
+    setManualEmailKind(kind);
+    setManualEmailResult(null);
+    try {
+      const result = kind === 'review'
+        ? await sendApplicationReviewEmail(activeApplication.id)
+        : await sendApplicationAcceptanceEmail(activeApplication.id);
+      setManualEmailResult({
+        ok: result.delivered,
+        message: result.delivered
+          ? `${kind === 'review' ? 'Review summary' : 'Acceptance update'} sent to ${profile.candidate.email}.`
+          : 'Send attempted but delivery was not confirmed.'
+      });
+      const refreshed = await fetchCandidateSupportProfile(profile.candidate.email);
+      setProfile(refreshed);
+    } catch (err: any) {
+      setManualEmailResult({ ok: false, message: err.message || 'Failed to send application email.' });
+    } finally {
+      setManualEmailKind(null);
     }
   };
 
@@ -241,6 +270,53 @@ export const CandidateControlPanelPage: React.FC = () => {
       setCodeCopied(code);
       setTimeout(() => setCodeCopied(null), 2000);
     });
+  };
+
+  const buildAssumePaidKey = (
+    applicationId: string,
+    packageRef: string,
+    itemType: 'course' | 'exam',
+    itemId: string
+  ) => `${applicationId}:${packageRef}:${itemType}:${itemId}`;
+
+  const handleAssumePaid = async (
+    applicationId: string,
+    packageRef: string,
+    itemType: 'course' | 'exam',
+    itemId: string,
+    itemName: string
+  ) => {
+    if (!profile) return;
+
+    const key = buildAssumePaidKey(applicationId, packageRef, itemType, itemId);
+    setAssumingPaidKey(key);
+    setPanelNotice(null);
+    setError('');
+
+    try {
+      const result = await assumeSupportItemPaid({
+        applicationId,
+        packageRef,
+        itemType,
+        itemId
+      });
+
+      setPanelNotice({
+        ok: true,
+        message: `${itemName}: ${result.message}`
+      });
+
+      const refreshed = await fetchCandidateSupportProfile(profile.candidate.email);
+      setProfile(refreshed);
+      setActiveApplicationId((prev) => prev || refreshed.applications[0]?.id || null);
+    } catch (err: any) {
+      setPanelNotice({
+        ok: false,
+        message: err?.message || `Could not mark ${itemName} as paid.`
+      });
+    } finally {
+      setAssumingPaidKey(null);
+    }
   };
 
   return (
@@ -434,11 +510,97 @@ export const CandidateControlPanelPage: React.FC = () => {
                       <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-2">
                         Assigned Atesta Package(s)
                       </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-3">
                         {activeApplication.assignedPackages.map((pkg) => (
-                          <div key={pkg.id} className="border border-slate-200 rounded-xl p-3 bg-white">
-                            <p className="text-sm font-extrabold text-slate-900">{pkg.name}</p>
-                            <p className="text-xs font-bold text-indigo-700 mt-0.5">Package ID: {pkg.packageId}</p>
+                          <div key={`${pkg.id}-${pkg.packageId}`} className="border border-slate-200 rounded-xl p-3 bg-white space-y-3">
+                            <div>
+                              <p className="text-sm font-extrabold text-slate-900">{pkg.name}</p>
+                              <p className="text-xs font-bold text-indigo-700 mt-0.5">Package ID: {pkg.packageId}</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                              <div className="rounded-lg border border-slate-200 p-3 bg-slate-50/70 space-y-2">
+                                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-600">Courses</p>
+                                {pkg.courses.length === 0 ? (
+                                  <p className="text-xs text-slate-500">No courses attached to this package.</p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {pkg.courses.map((course) => {
+                                      const itemKey = buildAssumePaidKey(activeApplication.id, pkg.id, 'course', course.id);
+                                      const loadingAssume = assumingPaidKey === itemKey;
+                                      const canAssumePaid = course.needsPayment && !course.isPaid;
+                                      return (
+                                        <div key={course.id} className="rounded-md border border-slate-200 bg-white p-2.5 space-y-1.5">
+                                          <p className="text-xs font-bold text-slate-800">{course.name}</p>
+                                          <p className="text-[11px] text-slate-500">
+                                            Cost: {typeof course.costKsh === 'number' ? `KSh ${course.costKsh.toLocaleString()}` : 'Not set'}
+                                          </p>
+                                          <p className={`text-[11px] font-semibold ${course.isPaid ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                            {course.isPaid ? 'Paid / Unlocked' : course.needsPayment ? 'Awaiting payment' : 'No payment required'}
+                                          </p>
+                                          {course.paymentRef && (
+                                            <p className="text-[10px] text-slate-500">Ref: {course.paymentRef}</p>
+                                          )}
+                                          {canAssumePaid && (
+                                            <button
+                                              type="button"
+                                              disabled={loadingAssume}
+                                              onClick={() =>
+                                                void handleAssumePaid(activeApplication.id, pkg.id, 'course', course.id, course.name)
+                                              }
+                                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[10px] font-bold"
+                                            >
+                                              {loadingAssume ? 'Updating...' : 'Assume Paid'}
+                                            </button>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="rounded-lg border border-slate-200 p-3 bg-slate-50/70 space-y-2">
+                                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-600">Exams</p>
+                                {pkg.exams.length === 0 ? (
+                                  <p className="text-xs text-slate-500">No exams attached to this package.</p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {pkg.exams.map((exam) => {
+                                      const itemKey = buildAssumePaidKey(activeApplication.id, pkg.id, 'exam', exam.id);
+                                      const loadingAssume = assumingPaidKey === itemKey;
+                                      const canAssumePaid = exam.needsPayment && !exam.isPaid;
+                                      return (
+                                        <div key={exam.id} className="rounded-md border border-slate-200 bg-white p-2.5 space-y-1.5">
+                                          <p className="text-xs font-bold text-slate-800">{exam.name}</p>
+                                          <p className="text-[11px] text-slate-500">
+                                            Cost: {typeof exam.costKsh === 'number' ? `KSh ${exam.costKsh.toLocaleString()}` : 'Not set'}
+                                          </p>
+                                          <p className={`text-[11px] font-semibold ${exam.isPaid ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                            {exam.isPaid ? 'Paid / Unlocked' : exam.needsPayment ? 'Awaiting payment' : 'No payment required'}
+                                          </p>
+                                          {exam.paymentRef && (
+                                            <p className="text-[10px] text-slate-500">Ref: {exam.paymentRef}</p>
+                                          )}
+                                          {canAssumePaid && (
+                                            <button
+                                              type="button"
+                                              disabled={loadingAssume}
+                                              onClick={() =>
+                                                void handleAssumePaid(activeApplication.id, pkg.id, 'exam', exam.id, exam.name)
+                                              }
+                                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[10px] font-bold"
+                                            >
+                                              {loadingAssume ? 'Updating...' : 'Assume Paid'}
+                                            </button>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -521,6 +683,24 @@ export const CandidateControlPanelPage: React.FC = () => {
               </button>
 
               <button
+                onClick={() => void handleSendManualEmail('review')}
+                disabled={manualEmailKind !== null || !activeApplication}
+                className="px-5 py-2.5 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm transition cursor-pointer flex items-center gap-2"
+              >
+                <Mail className="h-4 w-4" />
+                {manualEmailKind === 'review' ? 'Sending Review...' : 'Send Review Summary'}
+              </button>
+
+              <button
+                onClick={() => void handleSendManualEmail('acceptance')}
+                disabled={manualEmailKind !== null || !activeApplication}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm transition cursor-pointer flex items-center gap-2"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                {manualEmailKind === 'acceptance' ? 'Sending Acceptance...' : 'Send Acceptance Update'}
+              </button>
+
+              <button
                 disabled
                 title="WhatsApp sending is coming in a future update"
                 className="px-5 py-2.5 bg-slate-100 text-slate-400 font-bold text-xs rounded-xl cursor-not-allowed flex items-center gap-2"
@@ -541,6 +721,12 @@ export const CandidateControlPanelPage: React.FC = () => {
               >
                 {sendResult.ok ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
                 {sendResult.message}
+              </div>
+            )}
+            {manualEmailResult && (
+              <div className={`flex items-center gap-2 text-xs font-semibold rounded-lg px-3 py-2 border ${manualEmailResult.ok ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-rose-700 bg-rose-50 border-rose-200'}`}>
+                {manualEmailResult.ok ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
+                {manualEmailResult.message}
               </div>
             )}
           </div>

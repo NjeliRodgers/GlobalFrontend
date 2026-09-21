@@ -5,7 +5,11 @@ import {
   CandidatesDirectoryAnalytics,
   CandidatesDirectoryFilters
 } from '../api/usersApi';
-import { sendApplicationAccessCodeEmail } from '../api/applicationsApi';
+import {
+  sendApplicationAccessCodeEmail,
+  sendApplicationReviewEmail,
+  sendApplicationAcceptanceEmail
+} from '../api/applicationsApi';
 import {
   Search,
   Users,
@@ -37,6 +41,8 @@ const EMPTY_ANALYTICS: CandidatesDirectoryAnalytics = {
   paidCandidatesInPeriod: 0,
   paymentTransactionsInPeriod: 0,
   totalCashCollectedKsh: 0,
+  manualPaymentTransactionsInPeriod: 0,
+  manualCashCollectedKsh: 0,
   firstPaymentAt: null,
   lastPaymentAt: null,
   dailyCollections: [],
@@ -89,6 +95,8 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [sendingCodeEmailForAppId, setSendingCodeEmailForAppId] = useState<string | null>(null);
   const [codeEmailStatusByAppId, setCodeEmailStatusByAppId] = useState<Record<string, { ok: boolean; message: string }>>({});
+  const [sendingManualEmail, setSendingManualEmail] = useState<string | null>(null);
+  const [manualEmailStatusByAppId, setManualEmailStatusByAppId] = useState<Record<string, { ok: boolean; message: string }>>({});
 
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -219,6 +227,28 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
       }));
     } finally {
       setSendingCodeEmailForAppId(null);
+    }
+  };
+
+  const handleSendManualApplicationEmail = async (applicationId: string, kind: 'review' | 'acceptance') => {
+    const actionKey = `${kind}:${applicationId}`;
+    setSendingManualEmail(actionKey);
+    setManualEmailStatusByAppId((prev) => ({ ...prev, [applicationId]: { ok: false, message: '' } }));
+    try {
+      const result = kind === 'review'
+        ? await sendApplicationReviewEmail(applicationId)
+        : await sendApplicationAcceptanceEmail(applicationId);
+      setManualEmailStatusByAppId((prev) => ({
+        ...prev,
+        [applicationId]: { ok: result.delivered, message: result.delivered ? 'Email sent instantly.' : 'Email was not delivered.' }
+      }));
+    } catch (err: any) {
+      setManualEmailStatusByAppId((prev) => ({
+        ...prev,
+        [applicationId]: { ok: false, message: err.message || 'Failed to send email.' }
+      }));
+    } finally {
+      setSendingManualEmail(null);
     }
   };
 
@@ -515,6 +545,15 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
           <div className="text-2xl font-black text-sky-700 mt-1">{periodAnalytics.registrationsInPeriod}</div>
           <p className="text-[10px] text-slate-500 mt-0.5">Atesta registrations: {periodAnalytics.atestaRegistrationsInPeriod}</p>
         </div>
+
+        <div className="bg-amber-50 rounded-2xl border border-amber-200 p-4 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase text-amber-800">Manual Recorded Payments</span>
+            <HandCoins className="h-4 w-4 text-amber-700" />
+          </div>
+          <div className="text-2xl font-black text-amber-800 mt-1">{formatCurrency(periodAnalytics.manualCashCollectedKsh)}</div>
+          <p className="text-[10px] text-amber-700 mt-0.5">{periodAnalytics.manualPaymentTransactionsInPeriod} transaction(s) in selected period</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -807,6 +846,29 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                                               }`}
                                             >
                                               {codeEmailStatusByAppId[app.applicationId].message}
+                                            </p>
+                                          )}
+                                          <div className="flex flex-wrap gap-1.5 mt-1">
+                                            <button
+                                              type="button"
+                                              onClick={() => void handleSendManualApplicationEmail(app.applicationId, 'review')}
+                                              disabled={sendingManualEmail === `review:${app.applicationId}`}
+                                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[10px] font-bold"
+                                            >
+                                              {sendingManualEmail === `review:${app.applicationId}` ? 'Sending Review...' : 'Send Review Summary'}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => void handleSendManualApplicationEmail(app.applicationId, 'acceptance')}
+                                              disabled={sendingManualEmail === `acceptance:${app.applicationId}`}
+                                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[10px] font-bold"
+                                            >
+                                              {sendingManualEmail === `acceptance:${app.applicationId}` ? 'Sending Acceptance...' : 'Send Acceptance Update'}
+                                            </button>
+                                          </div>
+                                          {manualEmailStatusByAppId[app.applicationId]?.message && (
+                                            <p className={`mt-1 text-[10px] ${manualEmailStatusByAppId[app.applicationId].ok ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                              {manualEmailStatusByAppId[app.applicationId].message}
                                             </p>
                                           )}
                                         </div>
