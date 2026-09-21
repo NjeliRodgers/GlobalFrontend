@@ -161,7 +161,7 @@ export const AppShell: React.FC = () => {
         const job = await fetchJobById(id);
         if (job) {
           setSelectedJob(job);
-          if (tab === 'apply' && (!isAuthenticated || role !== 'candidate')) {
+          if (tab === 'apply' && !isAuthenticated) {
             setActiveTab('job_detail');
           } else {
             setActiveTab(tab);
@@ -193,7 +193,7 @@ export const AppShell: React.FC = () => {
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, [selectedJob?.id]);
+  }, [selectedJob?.id, isAuthenticated, role]);
 
   // Keep the address bar in sync with in-app navigation so refreshing (or
   // sharing the link) restores the same tab/job/application instead of the
