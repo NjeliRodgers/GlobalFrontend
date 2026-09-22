@@ -24,6 +24,8 @@ export async function signUpApi(userData: {
   phone?: string;
   department?: string;
   gender?: string;
+  location?: string;
+  age?: number;
 }): Promise<{ user: User; message: string }> {
   const res = await apiFetch('/users/signup', {
     method: 'POST',
@@ -103,6 +105,7 @@ export interface CandidateDirectoryRow {
   email: string;
   phone: string;
   location: string;
+  age: number | null;
   isPlatformAccountActive: boolean;
   registeredAt: string;
   hasAtestaAccount: boolean;

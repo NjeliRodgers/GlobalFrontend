@@ -75,6 +75,11 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({ onNavigate }) => {
                   About Us
                 </TabLink>
               </li>
+              <li>
+                <TabLink tab="contact" onNavigate={onNavigate} className={linkClass}>
+                  Contact Us
+                </TabLink>
+              </li>
               {!isAuthenticated && (
                 <li>
                   <button type="button" onClick={() => openAuthModal()} className={linkClass}>

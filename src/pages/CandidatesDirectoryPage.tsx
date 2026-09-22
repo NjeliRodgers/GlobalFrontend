@@ -721,7 +721,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                         <td className="p-3">
                           <div className="font-bold text-slate-900">{row.name}</div>
                           <div className="text-[10px] text-slate-500">{row.email}</div>
-                          <div className="text-[10px] text-slate-400">{row.phone || 'No phone'} • {row.location || 'No location'}</div>
+                          <div className="text-[10px] text-slate-400">{row.phone || 'No phone'} • {row.location || 'No location'}{row.age ? ` • Age ${row.age}` : ''}</div>
                         </td>
                         <td className="p-3">
                           <span

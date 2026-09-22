@@ -7,6 +7,7 @@ export interface SupportCandidate {
   email: string;
   phone: string;
   location: string;
+  age: number | null;
   hasPlatformAccount: boolean;
   platformAccountActive: boolean;
   platformJoinedAt: string | null;

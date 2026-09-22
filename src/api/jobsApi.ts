@@ -1,7 +1,7 @@
 import { Job } from '../types';
 import { apiFetch, jsonHeaders } from './client';
 
-export async function fetchJobs(filters?: { location?: string; department?: string; workType?: string }): Promise<Job[]> {
+export async function fetchJobs(filters?: { location?: string; department?: string; workType?: string; status?: string }): Promise<Job[]> {
   try {
     const query = new URLSearchParams(filters as any).toString();
     const res = await apiFetch(`/jobs?${query}`);

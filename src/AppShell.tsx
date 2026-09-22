@@ -6,6 +6,7 @@ import { Sidebar } from './components/Sidebar';
 import { AuthModal } from './auth/AuthModal';
 import { HomePage } from './pages/HomePage';
 import { AboutUsPage } from './pages/AboutUsPage';
+import { ContactUsPage } from './pages/ContactUsPage';
 import { SiteContentAdminPage } from './pages/SiteContentAdminPage';
 import { PublicFooter } from './components/public/PublicFooter';
 
@@ -35,7 +36,7 @@ const APPLICATION_SCOPED_TABS = new Set(['import_detail']);
 // The only screens a signed-out visitor may see: the public job board and
 // an individual job's public description page. Everything else — for any
 // role — requires being logged in.
-const PUBLIC_TABS = new Set(['job_board', 'job_detail', 'home', 'about']);
+const PUBLIC_TABS = new Set(['job_board', 'job_detail', 'home', 'about', 'contact']);
 
 const parseHash = (): { tab: string; id?: string } => {
   const raw = window.location.hash.replace(/^#\/?/, '');
@@ -295,7 +296,7 @@ export const AppShell: React.FC = () => {
 
         <main
           className={
-            activeTab === 'home' || activeTab === 'about'
+            activeTab === 'home' || activeTab === 'about' || activeTab === 'contact'
               ? 'flex-1 w-full min-w-0'
               : 'flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 min-w-0'
           }
@@ -303,6 +304,8 @@ export const AppShell: React.FC = () => {
           {activeTab === 'home' && <HomePage onNavigate={goToPublicTab} />}
 
           {activeTab === 'about' && <AboutUsPage onNavigate={goToPublicTab} />}
+
+          {activeTab === 'contact' && <ContactUsPage />}
 
           {activeTab === 'site_content_admin' && isAuthenticated && (role === 'admin' || role === 'recruiter') && <SiteContentAdminPage />}
           {activeTab === 'job_board' && (
@@ -388,7 +391,7 @@ export const AppShell: React.FC = () => {
         </main>
       </div>
 
-      {(!isAuthenticated || activeTab === 'home' || activeTab === 'about') && (
+      {(!isAuthenticated || activeTab === 'home' || activeTab === 'about' || activeTab === 'contact') && (
         <PublicFooter onNavigate={goToPublicTab} />
       )}
 

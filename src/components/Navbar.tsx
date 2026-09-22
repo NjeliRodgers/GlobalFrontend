@@ -26,6 +26,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, activeTab, setA
     { tab: 'home', label: 'Home' },
     { tab: 'job_board', label: 'Opportunities' },
     { tab: 'about', label: 'About Us' },
+    { tab: 'contact', label: 'Contact Us' },
   ];
   const goToPublicTab = (tab: string) => {
     setActiveTab(tab);
