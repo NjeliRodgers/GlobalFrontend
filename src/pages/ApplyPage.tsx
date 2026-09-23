@@ -147,6 +147,7 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
   // for a couple seconds, THEN send the candidate back to the job board —
   // they should never land straight back on recommended jobs with no feedback.
   const [submitted, setSubmitted] = useState(false);
+  const SUBMISSION_REDIRECT_DELAY_MS = 800;
 
   // Block re-applying to a job the candidate has already applied for —
   // checked once on mount so the form never even renders for a duplicate.
@@ -293,17 +294,19 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
         }
       }
 
-      const uploadedDocuments: SubmittedDocument[] = [];
-      for (const item of uploads) {
-        try {
-          const uploaded = await uploadApplicationDocument(item.file, item.fileType);
-          uploadedDocuments.push(uploaded);
-        } catch (uploadError: any) {
-          throw new Error(
-            `Could not upload your ${item.fileType.replace('_', ' ')} document. ${uploadError.message || 'Please try again.'}`
-          );
-        }
-      }
+      // Upload in parallel so candidates with multiple attachments are not
+      // blocked by one-by-one network round trips.
+      const uploadedDocuments = await Promise.all(
+        uploads.map(async (item) => {
+          try {
+            return await uploadApplicationDocument(item.file, item.fileType);
+          } catch (uploadError: any) {
+            throw new Error(
+              `Could not upload your ${item.fileType.replace('_', ' ')} document. ${uploadError?.message || 'Please try again.'}`
+            );
+          }
+        })
+      );
 
       const { application } = await submitApplication({
         jobId: job.id,
@@ -326,7 +329,7 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
       setSubmitted(true);
       setTimeout(() => {
         onSubmitted(application.id);
-      }, 2600);
+      }, SUBMISSION_REDIRECT_DELAY_MS);
     } catch (err: any) {
       setError(err.message || 'Failed to save application');
       setSaving(false);

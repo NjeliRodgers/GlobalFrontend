@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   GraduationCap,
   Home,
+  ShieldCheck,
   Plane,
   Ticket,
   Utensils,
@@ -22,10 +23,22 @@ const supportHighlights = [
 ];
 
 const processSteps = [
-  'Complete your online application.',
-  'After screening your details, we invite you to an interview.',
-  'When you meet the client\'s technical and professional requirements, we present your profile to the client.',
-  'If the client accepts you, you join our candidate pool and continue toward placement.'
+  {
+    title: 'Simple online application',
+    detail: 'Submit your application through our platform in a few guided steps.'
+  },
+  {
+    title: 'Screening and interview invitation',
+    detail: 'Our team reviews your details and invites qualified candidates for an interview.'
+  },
+  {
+    title: 'Client presentation',
+    detail: 'When you meet technical and professional requirements, we present your profile to the client.'
+  },
+  {
+    title: 'Candidate pool and placement pathway',
+    detail: 'If selected by the client, you join our talent pool and proceed toward placement.'
+  }
 ];
 
 export const RecruitmentProcessModal: React.FC<RecruitmentProcessModalProps> = ({ onClose }) => {
@@ -71,7 +84,7 @@ export const RecruitmentProcessModal: React.FC<RecruitmentProcessModalProps> = (
                 Your pathway to international opportunity
               </h2>
               <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-200">
-                We specialize in connecting qualified professionals with companies that value their employees and invest in their success.
+                We specialize in connecting qualified professionals with employers that value their people and invest in long-term success.
               </p>
             </div>
           </div>
@@ -81,7 +94,7 @@ export const RecruitmentProcessModal: React.FC<RecruitmentProcessModalProps> = (
           <div>
             <h3 className="text-base font-extrabold text-slate-900">What selected opportunities may offer</h3>
             <p className="mt-1 text-sm leading-relaxed text-slate-600">
-              Depending on the position and employer, packages may include a competitive salary together with:
+              Depending on the position and employer, packages may include a strong salary together with:
             </p>
             <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {supportHighlights.map(({ icon: Icon, label }) => (
@@ -97,11 +110,14 @@ export const RecruitmentProcessModal: React.FC<RecruitmentProcessModalProps> = (
             <h3 className="text-base font-extrabold text-slate-900">Our selection process</h3>
             <ol className="mt-3 space-y-3">
               {processSteps.map((step, index) => (
-                <li key={step} className="flex items-start gap-3 text-sm leading-relaxed text-slate-600">
+                <li key={step.title} className="flex items-start gap-3 text-sm leading-relaxed text-slate-600">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#e8f0f7] text-xs font-extrabold text-[#1f4e79]">
                     {index + 1}
                   </span>
-                  <span>{step}</span>
+                  <div>
+                    <p className="font-bold text-slate-800">{step.title}</p>
+                    <p>{step.detail}</p>
+                  </div>
                 </li>
               ))}
             </ol>
@@ -112,6 +128,15 @@ export const RecruitmentProcessModal: React.FC<RecruitmentProcessModalProps> = (
               <GraduationCap className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
               <p className="text-sm leading-relaxed text-amber-950">
                 To maintain a high success rate, we generally present trained professionals to clients. If you are not yet trained in your field, you may be required to complete a relevant professional training course and obtain a certificate before your profile is sent to a client.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
+            <div className="flex items-start gap-3">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
+              <p className="text-sm leading-relaxed text-emerald-950">
+                Our goal is quality matching for both professionals and employers. This process helps protect your time and improves placement success.
               </p>
             </div>
           </div>
