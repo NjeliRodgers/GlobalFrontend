@@ -1,5 +1,5 @@
 
-export type SiteContentPageKey = 'home' | 'about' | 'footer' | 'legal';
+export type SiteContentPageKey = 'home' | 'about' | 'footer' | 'legal' | 'contact';
 
 export interface TitledItem {
   title: string;
@@ -62,6 +62,15 @@ export interface AboutContent {
   cta: CtaContent;
 }
 
+export interface ContactContent {
+  hero: { title: string; subtitle: string };
+  phone: string[];
+  email: string[];
+  hours: string[];
+  whatsappNumber: string;
+  form: { heading: string; subtitle: string };
+}
+
 export interface FooterContent {
   tagline: string;
   description: string;
@@ -91,6 +100,7 @@ export interface SiteContent {
   about: AboutContent;
   footer: FooterContent;
   legal: LegalContent;
+  contact: ContactContent;
 }
 
 const CORE_VALUES: TitledItem[] = [
@@ -220,6 +230,21 @@ export const DEFAULT_ABOUT: AboutContent = {
     subtitle: 'Browse current openings and take the first step toward your next opportunity abroad.',
     primaryCta: 'View Open Positions',
     secondaryCta: 'Sign In / Register',
+  },
+};
+
+export const DEFAULT_CONTACT: ContactContent = {
+  hero: {
+    title: 'Contact Us',
+    subtitle: "We'd love to hear from you. Get in touch with our team for any inquiries or support.",
+  },
+  phone: ['+254182326644'],
+  email: ['Globaltalentplus@gmail.com'],
+  hours: ['Monday - Friday: 8:00 AM - 6:00 PM', 'Saturday: 9:00 AM - 6:00 PM'],
+  whatsappNumber: '254182326644',
+  form: {
+    heading: 'Send us a Message',
+    subtitle: "Fill out the form below and we'll get back to you as soon as possible",
   },
 };
 
@@ -355,6 +380,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   about: DEFAULT_ABOUT,
   footer: DEFAULT_FOOTER,
   legal: DEFAULT_LEGAL,
+  contact: DEFAULT_CONTACT,
 };
 
 export function mergeWithDefaults<T>(base: T, override: unknown): T {
@@ -391,5 +417,6 @@ export function buildSiteContent(stored: Partial<Record<SiteContentPageKey, unkn
     about: mergeWithDefaults(DEFAULT_ABOUT, stored.about),
     footer: mergeWithDefaults(DEFAULT_FOOTER, stored.footer),
     legal: mergeWithDefaults(DEFAULT_LEGAL, stored.legal),
+    contact: mergeWithDefaults(DEFAULT_CONTACT, stored.contact),
   };
 }

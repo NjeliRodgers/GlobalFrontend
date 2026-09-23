@@ -16,6 +16,8 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, onSwitchToLog
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [gender, setGender] = useState('');
+  const [location, setLocation] = useState('');
+  const [age, setAge] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<UserRole>('candidate');
@@ -27,6 +29,15 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, onSwitchToLog
     e.preventDefault();
     if (!name || !email || !phone || !password) {
       setError('Name, email, phone number and password are required');
+      return;
+    }
+    if (!location.trim()) {
+      setError('Location is required');
+      return;
+    }
+    const parsedAge = Number(age);
+    if (!age || Number.isNaN(parsedAge) || parsedAge < 16 || parsedAge > 100) {
+      setError('A valid age is required');
       return;
     }
     if (!isValidEmail(email)) {
@@ -49,7 +60,7 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, onSwitchToLog
     setLoading(true);
     setError('');
     try {
-      await signup({ name, email, password, role, phone, gender });
+      await signup({ name, email, password, role, phone, gender, location, age: parsedAge });
       setLoading(false);
       // Account is created but inactive — no session was started.
       // Show a confirmation screen instead of closing the modal via onSuccess.
@@ -150,6 +161,37 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, onSwitchToLog
             <option value="Non-Binary">Non-Binary</option>
             <option value="Prefer not to say">Prefer not to say</option>
           </select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+              Location <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              required
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+              placeholder="City, Country"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+              Age <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              min={16}
+              max={100}
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              required
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+              placeholder="Your age"
+            />
+          </div>
         </div>
 
         <div>

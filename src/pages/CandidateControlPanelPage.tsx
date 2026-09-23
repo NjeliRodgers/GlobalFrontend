@@ -423,6 +423,9 @@ export const CandidateControlPanelPage: React.FC = () => {
                     {profile.candidate.location && (
                       <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{profile.candidate.location}</span>
                     )}
+                    {profile.candidate.age && (
+                      <span className="flex items-center gap-1">Age: {profile.candidate.age}</span>
+                    )}
                   </div>
                 </div>
               </div>

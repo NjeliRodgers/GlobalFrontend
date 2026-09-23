@@ -10,6 +10,7 @@ export interface User {
   phone?: string;
   gender?: string;
   location?: string;
+  age?: number;
   createdAt: string;
 }
 
@@ -362,6 +363,8 @@ export interface EmailLog {
   status: 'delivered' | 'sent' | 'failed';
   triggerEvent: 'assessment_pass' | 'assessment_fail' | 'assessment_completed' | 'interview_pass' | 'interview_fail' | 'application_received' | 'interview_scheduled' | 'stage_change' | 'password_reset' | 'account_activation' | 'apex_enrollment_payment_received' | 'national_id_recovery' | 'custom' | 'custom_job_broadcast';  pdfAttachmentName?: string;
   pdfDataUrl?: string;
+  candidateLocation?: string;
+  candidateAge?: number;
 }
 
 export interface RbacRole {

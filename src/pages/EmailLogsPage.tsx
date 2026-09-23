@@ -94,6 +94,11 @@ export const EmailLogsPage: React.FC = () => {
                       <div>
                         <span className="font-extrabold text-slate-900 text-sm">{log.candidateName}</span>
                         <span className="text-xs text-slate-400 font-mono ml-2">({log.candidateEmail})</span>
+                        {(log.candidateLocation || log.candidateAge) && (
+                          <span className="text-[10px] text-slate-400 ml-2">
+                            {log.candidateLocation}{log.candidateLocation && log.candidateAge ? ' • ' : ''}{log.candidateAge ? `Age ${log.candidateAge}` : ''}
+                          </span>
+                        )}
                       </div>
                     </div>
 

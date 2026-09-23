@@ -490,6 +490,39 @@ const AboutEditor: React.FC = () => (
   </div>
 );
 
+const ContactEditor: React.FC = () => (
+  <div className="space-y-5">
+    <Section title="Header" description="The blue banner at the top of the Contact Us page.">
+      <TextField label="Title" path={['hero', 'title']} />
+      <AreaField label="Subtitle" path={['hero', 'subtitle']} />
+    </Section>
+
+    <Section title="Phone" description="Each line becomes its own row on the Phone card.">
+      <ListEditor path={['phone']} itemLabel="Phone number" fields={[]} template="" stringItems addLabel="Add phone number" />
+    </Section>
+
+    <Section title="Email" description="Each line becomes its own row on the Email card.">
+      <ListEditor path={['email']} itemLabel="Email address" fields={[]} template="" stringItems addLabel="Add email address" />
+    </Section>
+
+    <Section title="Working hours" description="Each line becomes its own row on the Working Hours card.">
+      <ListEditor path={['hours']} itemLabel="Line" fields={[]} template="" stringItems addLabel="Add line" />
+    </Section>
+
+    <Section
+      title="WhatsApp"
+      description="The number that receives messages sent from the Contact form, digits only with country code (no + or leading 0), for example 254182326644."
+    >
+      <TextField label="WhatsApp number" path={['whatsappNumber']} placeholder="254182326644" />
+    </Section>
+
+    <Section title="Message form" description="Text shown above the Send us a Message form.">
+      <TextField label="Heading" path={['form', 'heading']} />
+      <AreaField label="Subtitle" path={['form', 'subtitle']} />
+    </Section>
+  </div>
+);
+
 const FooterEditor: React.FC = () => (
   <div className="space-y-5">
     <Section
@@ -565,13 +598,11 @@ const LegalEditor: React.FC = () => {
   );
 };
 
-// ---------------------------------------------------------------------------
-// The page
-// ---------------------------------------------------------------------------
 
 const PAGE_TABS: { key: SiteContentPageKey; label: string; previewTab: string | null }[] = [
   { key: 'home', label: 'Home', previewTab: 'home' },
   { key: 'about', label: 'About Us', previewTab: 'about' },
+  { key: 'contact', label: 'Contact Us', previewTab: 'contact' },
   { key: 'footer', label: 'Footer', previewTab: 'home' },
   { key: 'legal', label: 'Legal pop-ups', previewTab: 'home' },
 ];
@@ -734,6 +765,7 @@ export const SiteContentAdminPage: React.FC = () => {
       <EditorContext.Provider value={editorValue}>
         {activePage === 'home' && <HomeEditor />}
         {activePage === 'about' && <AboutEditor />}
+        {activePage === 'contact' && <ContactEditor />}
         {activePage === 'footer' && <FooterEditor />}
         {activePage === 'legal' && <LegalEditor />}
       </EditorContext.Provider>
