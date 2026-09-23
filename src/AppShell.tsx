@@ -8,6 +8,7 @@ import { HomePage } from './pages/HomePage';
 import { AboutUsPage } from './pages/AboutUsPage';
 import { SiteContentAdminPage } from './pages/SiteContentAdminPage';
 import { PublicFooter } from './components/public/PublicFooter';
+import { RecruitmentProcessModal } from './components/RecruitmentProcessModal';
 
 import { JobBoardPage } from './pages/JobBoardPage';
 import { SponsorshipProcessPage } from './pages/SponsorshipProcessPage';
@@ -103,6 +104,7 @@ export const AppShell: React.FC = () => {
   const [highlightedJobId, setHighlightedJobId] = useState<string | undefined>(
     initialHash.tab === 'job_board' ? initialHash.id : undefined
   );
+  const [showRecruitmentModal, setShowRecruitmentModal] = useState(false);
 
   const wasAuthenticatedRef = useRef(isAuthenticated);
 
@@ -127,6 +129,10 @@ export const AppShell: React.FC = () => {
       setActiveTab('job_board');
     }
   }, [isAuthenticated, activeTab]);
+
+  useEffect(() => {
+    setShowRecruitmentModal(activeTab === 'job_detail' || activeTab === 'apply');
+  }, [activeTab]);
 
   const applyHashRoute = async (route: { tab: string; id?: string }, showLoader = false) => {
     const { tab, id } = route;
@@ -393,6 +399,10 @@ export const AppShell: React.FC = () => {
       )}
 
       <AuthModal />
+
+      {showRecruitmentModal && (
+        <RecruitmentProcessModal onClose={() => setShowRecruitmentModal(false)} />
+      )}
     </div>
   );
 };
