@@ -17,7 +17,6 @@ import { FundingDashboardPage } from './pages/FundingDashboardPage';
 import { JobDetailPage } from './pages/JobDetailPage';
 import { ApplyPage } from './pages/ApplyPage';
 import { ApexRecruiterPage } from './pages/ApexRecruiterPage';
-import { CandidateControlPanelPage } from './pages/CandidateControlPanelPage';
 import { CandidatePortalPage } from './pages/CandidatePortalPage';
 import { RecruiterDashboardPage } from './pages/RecruiterDashboardPage';
 import { PipelinePage } from './pages/PipelinePage';
@@ -137,6 +136,11 @@ export const AppShell: React.FC = () => {
 
   const applyHashRoute = async (route: { tab: string; id?: string }, showLoader = false) => {
     const { tab, id } = route;
+
+    if (tab === 'candidate_control_panel') {
+      setActiveTab('candidates_directory');
+      return;
+    }
 
     if (tab === 'job_board') {
       setHighlightedJobId(id);
@@ -356,8 +360,6 @@ export const AppShell: React.FC = () => {
           )}
 
           {activeTab === 'apex_recruiter' && isAuthenticated && <ApexRecruiterPage />}
-
-          {activeTab === 'candidate_control_panel' && isAuthenticated && <CandidateControlPanelPage />}
 
           {activeTab === 'candidate_portal' && isAuthenticated && (
             <CandidatePortalPage

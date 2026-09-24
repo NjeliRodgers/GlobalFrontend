@@ -13,10 +13,7 @@ import {
 import {
   Search,
   Users,
-  ChevronDown,
-  ChevronUp,
   ShieldCheck,
-  FolderOpen,
   BarChart3,
   Clock3,
   SlidersHorizontal,
@@ -24,8 +21,21 @@ import {
   Target,
   RefreshCw,
   Copy,
-  Check
+  Check,
+  Eye,
+  X,
+  Loader2,
+  PhoneCall,
+  Mail,
+  MessageCircle,
+  CalendarDays,
+  StickyNote,
+  Ban,
+  RotateCcw,
+  BookOpen,
+  GraduationCap
 } from 'lucide-react';
+import { fetchCandidateSupportProfile, SupportProfile, updateCandidateOperations, CandidateOperationsUpdate } from '../api/supportApi';
 
 interface CandidatesDirectoryPageProps {
   initialJobId?: string;
@@ -89,8 +99,17 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
   const [rows, setRows] = useState<CandidateDirectoryRow[]>([]);
   const [periodAnalytics, setPeriodAnalytics] = useState<CandidatesDirectoryAnalytics>(EMPTY_ANALYTICS);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedCandidate, setSelectedCandidate] = useState<CandidateDirectoryRow | null>(null);
+  const [candidateProfile, setCandidateProfile] = useState<SupportProfile | null>(null);
+  const [candidateProfileLoading, setCandidateProfileLoading] = useState(false);
+  const [candidateProfileError, setCandidateProfileError] = useState('');
+  const [activeModalApplicationId, setActiveModalApplicationId] = useState<string | null>(null);
+  const [candidateNote, setCandidateNote] = useState('');
+  const [followUpDate, setFollowUpDate] = useState('');
+  const [blockReason, setBlockReason] = useState('');
+  const [savingCandidateOperation, setSavingCandidateOperation] = useState(false);
   const [selectedActionId, setSelectedActionId] = useState<string>('all');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [sendingCodeEmailForAppId, setSendingCodeEmailForAppId] = useState<string | null>(null);
@@ -105,6 +124,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
   const [hasPayments, setHasPayments] = useState<'any' | 'yes' | 'no'>('any');
   const [hasApplications, setHasApplications] = useState<'any' | 'yes' | 'no'>('any');
   const [platformActive, setPlatformActive] = useState<'any' | 'yes' | 'no'>('any');
+  const [includeBlocked, setIncludeBlocked] = useState(false);
   const [minApplications, setMinApplications] = useState('');
   const [maxApplications, setMaxApplications] = useState('');
   const [minTotalPaidKsh, setMinTotalPaidKsh] = useState('');
@@ -117,17 +137,39 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     return undefined;
   };
 
+  const buildCurrentFilters = (): CandidatesDirectoryFilters => ({
+    fromDate: fromDate || undefined,
+    toDate: toDate || undefined,
+    atestaStatus,
+    salesStage: salesStageFilter === 'any' ? undefined : salesStageFilter,
+    hasPayments: hasPaymentsBoolean(hasPayments),
+    hasApplications: hasPaymentsBoolean(hasApplications),
+    platformActive: hasPaymentsBoolean(platformActive),
+    minApplications: minApplications ? Number(minApplications) : undefined,
+    maxApplications: maxApplications ? Number(maxApplications) : undefined,
+    minTotalPaidKsh: minTotalPaidKsh ? Number(minTotalPaidKsh) : undefined,
+    sortBy,
+    sortOrder,
+    search: search || undefined,
+    includeBlocked
+  });
+
   const loadData = async (filters?: CandidatesDirectoryFilters) => {
     setLoading(true);
+    setLoadError('');
     const requestFilters: CandidatesDirectoryFilters = {
       ...(initialJobId ? { jobId: initialJobId } : {}),
       ...(filters || {})
     };
-
-    const data = await fetchCandidatesDirectoryReport(requestFilters);
-    setRows(data.candidates);
-    setPeriodAnalytics(data.analytics || EMPTY_ANALYTICS);
-    setLoading(false);
+    try {
+      const data = await fetchCandidatesDirectoryReport(requestFilters);
+      setRows(data.candidates);
+      setPeriodAnalytics(data.analytics || EMPTY_ANALYTICS);
+    } catch (error: any) {
+      setLoadError(error?.message || 'Unable to load candidates directory.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -135,21 +177,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
   }, [initialJobId]);
 
   const applyFilters = async () => {
-    await loadData({
-      fromDate: fromDate || undefined,
-      toDate: toDate || undefined,
-      atestaStatus,
-      salesStage: salesStageFilter === 'any' ? undefined : salesStageFilter,
-      hasPayments: hasPaymentsBoolean(hasPayments),
-      hasApplications: hasPaymentsBoolean(hasApplications),
-      platformActive: hasPaymentsBoolean(platformActive),
-      minApplications: minApplications ? Number(minApplications) : undefined,
-      maxApplications: maxApplications ? Number(maxApplications) : undefined,
-      minTotalPaidKsh: minTotalPaidKsh ? Number(minTotalPaidKsh) : undefined,
-      sortBy,
-      sortOrder,
-      search: search || undefined
-    });
+    await loadData(buildCurrentFilters());
   };
 
   const clearAllFilters = async () => {
@@ -166,8 +194,9 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     setSortBy('registeredAt');
     setSortOrder('desc');
     setSearch('');
+    setIncludeBlocked(false);
     setSelectedActionId('all');
-    await loadData();
+    await loadData({ includeBlocked: false });
   };
 
   const formatCurrency = (value: number) =>
@@ -202,21 +231,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
             : `Send attempted but delivery was not confirmed for ${candidateEmail}.`
         }
       }));
-      await loadData({
-        fromDate: fromDate || undefined,
-        toDate: toDate || undefined,
-        atestaStatus,
-        salesStage: salesStageFilter === 'any' ? undefined : salesStageFilter,
-        hasPayments: hasPaymentsBoolean(hasPayments),
-        hasApplications: hasPaymentsBoolean(hasApplications),
-        platformActive: hasPaymentsBoolean(platformActive),
-        minApplications: minApplications ? Number(minApplications) : undefined,
-        maxApplications: maxApplications ? Number(maxApplications) : undefined,
-        minTotalPaidKsh: minTotalPaidKsh ? Number(minTotalPaidKsh) : undefined,
-        sortBy,
-        sortOrder,
-        search: search || undefined
-      });
+      await loadData(buildCurrentFilters());
     } catch (error: any) {
       setCodeEmailStatusByAppId((prev) => ({
         ...prev,
@@ -250,6 +265,62 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     } finally {
       setSendingManualEmail(null);
     }
+  };
+
+  const openCandidate = async (row: CandidateDirectoryRow) => {
+    setSelectedCandidate(row);
+    setCandidateProfile(null);
+    setCandidateProfileError('');
+    setCandidateNote('');
+    setCandidateProfileLoading(true);
+    try {
+      const profile = await fetchCandidateSupportProfile(row.email);
+      setCandidateProfile(profile);
+      setActiveModalApplicationId(profile.applications[0]?.id || null);
+      setFollowUpDate(profile.operations.nextFollowUpAt ? profile.operations.nextFollowUpAt.slice(0, 10) : '');
+      setBlockReason(profile.operations.blockedReason || '');
+    } catch (error: any) {
+      setCandidateProfileError(error?.message || 'Unable to load candidate details.');
+    } finally {
+      setCandidateProfileLoading(false);
+    }
+  };
+
+  const closeCandidate = () => {
+    if (savingCandidateOperation) return;
+    setSelectedCandidate(null);
+    setCandidateProfile(null);
+    setCandidateNote('');
+    setCandidateProfileError('');
+  };
+
+  const saveCandidateOperation = async (payload: CandidateOperationsUpdate) => {
+    if (!selectedCandidate || !candidateProfile) return;
+    setSavingCandidateOperation(true);
+    try {
+      const operations = await updateCandidateOperations({ candidateEmail: selectedCandidate.email, ...payload });
+      setCandidateProfile((current) => current ? { ...current, operations } : current);
+      await loadData(buildCurrentFilters());
+      if (!includeBlocked && payload.isBlocked === true) {
+        closeCandidate();
+      }
+      if (includeBlocked && payload.isBlocked === false) {
+        closeCandidate();
+      }
+    } catch (error: any) {
+      setCandidateProfileError(error?.message || 'Unable to save candidate action.');
+    } finally {
+      setSavingCandidateOperation(false);
+    }
+  };
+
+  const addCandidateNote = async () => {
+    const text = candidateNote.trim();
+    if (!text || !candidateProfile) return;
+    await saveCandidateOperation({
+      notes: [{ id: `note-${Date.now()}`, text, createdAt: new Date().toISOString() }, ...candidateProfile.operations.notes]
+    });
+    setCandidateNote('');
   };
 
   const filtered = useMemo(() => {
@@ -404,6 +475,15 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
             <option value="any">Platform Account: Any</option>
             <option value="yes">Platform active</option>
             <option value="no">Platform inactive</option>
+          </select>
+
+          <select
+            value={includeBlocked ? 'bin' : 'active'}
+            onChange={(e) => setIncludeBlocked(e.target.value === 'bin')}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="active">Candidate view: Active only</option>
+            <option value="bin">Candidate view: Blocked bin</option>
           </select>
 
           <input
@@ -688,8 +768,14 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
 
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-extrabold text-slate-900">All Registered Candidates ({filtered.length})</h2>
+          <h2 className="text-base font-extrabold text-slate-900">{includeBlocked ? 'Blocked Candidate Bin' : 'All Registered Candidates'} ({filtered.length})</h2>
         </div>
+
+        {loadError && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+            {loadError}
+          </div>
+        )}
 
         {loading ? (
           <div className="py-10 text-center text-xs text-slate-400">Loading candidate directory...</div>
@@ -713,8 +799,6 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
                 {filtered.map((row) => {
-                  const isOpen = expandedId === row.id;
-
                   return (
                     <React.Fragment key={row.id}>
                       <tr className="hover:bg-slate-50/80 transition">
@@ -746,141 +830,14 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                         <td className="p-3 font-bold text-emerald-700">{formatCurrency(row.totalPaidKsh || 0)}</td>
                         <td className="p-3 text-right">
                           <button
-                            onClick={() => setExpandedId(isOpen ? null : row.id)}
+                            onClick={() => void openCandidate(row)}
+                            title={`Open full profile for ${row.name}`}
                             className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-[11px]"
                           >
-                            {isOpen ? 'Hide' : 'View'}
-                            {isOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                            <Eye className="h-3.5 w-3.5" /> View
                           </button>
                         </td>
                       </tr>
-
-                      {isOpen && (
-                        <tr>
-                          <td colSpan={7} className="p-3 bg-slate-50/70">
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-                              <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
-                                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
-                                  <Users className="h-3.5 w-3.5 text-indigo-600" /> Account Details
-                                </h4>
-                                <p className="text-xs text-slate-700">Registered: {new Date(row.registeredAt).toLocaleString()}</p>
-                                <p className="text-xs text-slate-700">Atesta ID: {row.atestaAccountId || 'Not linked yet'}</p>
-                                <p className="text-xs text-slate-700">Days since registration: {row.daysSinceRegistration ?? 'N/A'}</p>
-                                <p className="text-xs text-slate-700">Days since activity: {row.daysSinceLastActivity ?? 'N/A'}</p>
-                              </div>
-
-                              <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
-                                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
-                                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Sales Actions
-                                </h4>
-                                {!row.actionTags || row.actionTags.length === 0 ? (
-                                  <p className="text-xs text-slate-500">No immediate action suggestion.</p>
-                                ) : (
-                                  <div className="flex flex-wrap gap-1">
-                                    {row.actionTags.map((tag) => (
-                                      <span key={tag} className="px-2 py-0.5 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 text-[10px] font-bold">
-                                        {tag.replace(/_/g, ' ')}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                                <p className="text-xs text-slate-700">Last payment: {row.lastPaymentAt ? new Date(row.lastPaymentAt).toLocaleString() : 'Never'}</p>
-                              </div>
-
-                              <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
-                                <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
-                                  <FolderOpen className="h-3.5 w-3.5 text-sky-600" /> Applied Jobs
-                                </h4>
-                                {row.applications.length === 0 ? (
-                                  <p className="text-xs text-slate-500">No job applications submitted yet.</p>
-                                ) : (
-                                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                                    {row.applications.map((app) => (
-                                      <div key={app.applicationId} className="text-xs bg-slate-50 rounded-md px-2 py-2 border border-slate-200 space-y-1">
-                                        <div className="font-semibold text-slate-900">{app.jobTitle}</div>
-                                        <div className="text-[10px] text-slate-500">Status: {app.stage}</div>
-                                        <div className="text-[10px] text-slate-500">Applied: {new Date(app.appliedAt).toLocaleDateString()}</div>
-                                        {(app.assignedPackages?.length || 0) > 0 && (
-                                          <div className="text-[10px] text-indigo-700">
-                                            Package ID(s): {app.assignedPackages?.map((pkg) => pkg.packageId).join(', ')}
-                                          </div>
-                                        )}
-                                        {app.voucher?.code ? (
-                                          <div className="flex items-center justify-between gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1">
-                                            <div>
-                                              <div className="text-[10px] text-indigo-700 font-semibold">One-time Access Code</div>
-                                              <div className="font-mono tracking-wider text-indigo-900 font-bold">{app.voucher.code}</div>
-                                              <div className="text-[10px] text-slate-500">
-                                                {app.voucher.redeemedAt ? `Used on ${new Date(app.voucher.redeemedAt).toLocaleString()}` : 'Not used yet'}
-                                              </div>
-                                            </div>
-                                            <button
-                                              type="button"
-                                              onClick={() => void copyCode(app.voucher!.code)}
-                                              className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md border border-indigo-300 bg-white hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold"
-                                            >
-                                              {copiedCode === app.voucher.code ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                                              {copiedCode === app.voucher.code ? 'Copied' : 'Copy'}
-                                            </button>
-                                          </div>
-                                        ) : (
-                                          <div className="text-[10px] text-amber-700">No course access code generated for this application.</div>
-                                        )}
-                                        <div className="pt-1">
-                                          <button
-                                            type="button"
-                                            onClick={() => void handleSendCodeEmail(app.applicationId, row.email)}
-                                            disabled={sendingCodeEmailForAppId === app.applicationId}
-                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[10px] font-bold"
-                                          >
-                                            {sendingCodeEmailForAppId === app.applicationId
-                                              ? 'Sending Access Email...'
-                                              : 'Send Access Code Email'}
-                                          </button>
-                                          {codeEmailStatusByAppId[app.applicationId] && (
-                                            <p
-                                              className={`mt-1 text-[10px] ${
-                                                codeEmailStatusByAppId[app.applicationId].ok
-                                                  ? 'text-emerald-700'
-                                                  : 'text-rose-700'
-                                              }`}
-                                            >
-                                              {codeEmailStatusByAppId[app.applicationId].message}
-                                            </p>
-                                          )}
-                                          <div className="flex flex-wrap gap-1.5 mt-1">
-                                            <button
-                                              type="button"
-                                              onClick={() => void handleSendManualApplicationEmail(app.applicationId, 'review')}
-                                              disabled={sendingManualEmail === `review:${app.applicationId}`}
-                                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[10px] font-bold"
-                                            >
-                                              {sendingManualEmail === `review:${app.applicationId}` ? 'Sending Review...' : 'Send Review Summary'}
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => void handleSendManualApplicationEmail(app.applicationId, 'acceptance')}
-                                              disabled={sendingManualEmail === `acceptance:${app.applicationId}`}
-                                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[10px] font-bold"
-                                            >
-                                              {sendingManualEmail === `acceptance:${app.applicationId}` ? 'Sending Acceptance...' : 'Send Acceptance Update'}
-                                            </button>
-                                          </div>
-                                          {manualEmailStatusByAppId[app.applicationId]?.message && (
-                                            <p className={`mt-1 text-[10px] ${manualEmailStatusByAppId[app.applicationId].ok ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                              {manualEmailStatusByAppId[app.applicationId].message}
-                                            </p>
-                                          )}
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
                     </React.Fragment>
                   );
                 })}
@@ -889,6 +846,67 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
           </div>
         )}
       </div>
+      {selectedCandidate && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 p-3 sm:p-6 overflow-y-auto" role="dialog" aria-modal="true" aria-label="Candidate details">
+          <div className="mx-auto w-full max-w-6xl rounded-2xl bg-slate-50 shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-white border-b border-slate-200 p-4 sm:p-6">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-12 w-12 rounded-full bg-[#1f4e79] text-white flex items-center justify-center font-black text-lg shrink-0">
+                  {selectedCandidate.name.slice(0, 1).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-black text-slate-900 truncate">{selectedCandidate.name}</h2>
+                  <p className="text-xs text-slate-500 truncate">{selectedCandidate.email} · {selectedCandidate.phone || 'No phone'} · {selectedCandidate.location || 'No location'}</p>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">{SALES_STAGE_LABELS[selectedCandidate.salesStage || ''] || selectedCandidate.salesStage || 'Unknown'}</span>
+                    {candidateProfile?.operations.isBlocked && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">Blocked</span>}
+                  </div>
+                </div>
+              </div>
+              <button type="button" onClick={closeCandidate} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100" title="Close candidate details"><X className="h-5 w-5" /></button>
+            </div>
+
+            {candidateProfileLoading ? (
+              <div className="p-16 text-center text-sm text-slate-500"><Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />Loading full candidate profile...</div>
+            ) : candidateProfileError ? (
+              <div className="m-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{candidateProfileError}</div>
+            ) : candidateProfile ? (
+              <div className="p-4 sm:p-6 space-y-4">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+                  <div className="bg-white rounded-xl border border-slate-200 p-3"><p className="text-[10px] uppercase font-bold text-slate-500">Applications</p><p className="text-xl font-black text-slate-900">{candidateProfile.applications.length}</p></div>
+                  <div className="bg-white rounded-xl border border-slate-200 p-3"><p className="text-[10px] uppercase font-bold text-slate-500">Paid</p><p className="text-xl font-black text-emerald-700">{formatCurrency(selectedCandidate.totalPaidKsh || 0)}</p></div>
+                  <div className="bg-white rounded-xl border border-slate-200 p-3"><p className="text-[10px] uppercase font-bold text-slate-500">Atesta</p><p className="text-xl font-black text-indigo-700">{candidateProfile.atestaAccount ? (candidateProfile.atestaAccount.isActive ? 'Active' : 'Inactive') : 'None'}</p></div>
+                  <div className="bg-white rounded-xl border border-slate-200 p-3"><p className="text-[10px] uppercase font-bold text-slate-500">Notes</p><p className="text-xl font-black text-slate-900">{candidateProfile.operations.notes.length}</p></div>
+                  <div className="bg-white rounded-xl border border-slate-200 p-3"><p className="text-[10px] uppercase font-bold text-slate-500">Follow-up</p><p className="text-sm font-black text-amber-700 mt-1">{candidateProfile.operations.nextFollowUpAt ? new Date(candidateProfile.operations.nextFollowUpAt).toLocaleDateString() : 'Not set'}</p></div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4">
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-xl border border-slate-200 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-3"><h3 className="font-black text-sm text-slate-900">Applications and progression</h3><div className="flex gap-1.5 flex-wrap">{candidateProfile.applications.map((app) => <button key={app.id} onClick={() => setActiveModalApplicationId(app.id)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${activeModalApplicationId === app.id ? 'bg-[#1f4e79] text-white' : 'bg-slate-100 text-slate-600'}`}>{app.jobTitle}</button>)}</div></div>
+                      {candidateProfile.applications.length === 0 ? <p className="text-xs text-slate-500">No job applications found.</p> : candidateProfile.applications.filter((app) => app.id === activeModalApplicationId || (!activeModalApplicationId && app === candidateProfile.applications[0])).map((app) => (
+                        <div key={app.id} className="space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-black text-slate-900">{app.jobTitle}</p><p className="text-xs text-slate-500">Applied {new Date(app.appliedAt).toLocaleDateString()} · <span className="font-bold text-indigo-700">{app.stage}</span></p></div><div className="text-right"><p className="text-xl font-black text-indigo-700">{app.readinessProgress.percentage}%</p><p className="text-[10px] text-slate-500">readiness</p></div></div>
+                          <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-indigo-600" style={{ width: `${app.readinessProgress.percentage}%` }} /></div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">{app.readinessProgress.items.map((item) => <div key={item.id} className={`rounded-lg border p-2 ${item.complete ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>{item.complete ? 'Complete' : 'Pending'} · {item.message}</div>)}</div>
+                          {app.assignedPackages.map((pkg) => <div key={pkg.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-bold text-xs text-slate-900 flex items-center gap-1"><BookOpen className="h-3.5 w-3.5 text-indigo-600" />{pkg.name}</p><div className="mt-2 space-y-1">{[...pkg.courses.map((item) => ({ ...item, type: 'Course' })), ...pkg.exams.map((item) => ({ ...item, type: 'Exam' }))].map((item) => <div key={`${item.type}-${item.id}`} className="flex items-center justify-between gap-2 text-[11px]"><span className="flex items-center gap-1"><GraduationCap className="h-3 w-3 text-slate-400" />{item.type}: {item.name}</span><span className={`font-bold ${item.isPaid ? 'text-emerald-700' : 'text-amber-700'}`}>{item.isPaid ? 'Paid / unlocked' : item.enrollmentStatus || 'Not paid'}</span></div>)}</div></div>)}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3">Communication history</h3>{candidateProfile.emailHistory.length === 0 ? <p className="text-xs text-slate-500">No email history.</p> : <div className="space-y-2 max-h-48 overflow-y-auto">{candidateProfile.emailHistory.map((log) => <div key={log.id} className="flex items-start justify-between gap-3 text-xs border-b border-slate-100 pb-2"><span><span className="font-bold text-slate-800">{log.subject}</span><span className="block text-[10px] text-slate-500">{new Date(log.sentAt).toLocaleString()}</span></span><span className="text-[10px] font-bold uppercase text-slate-500">{log.status}</span></div>)}</div>}</div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3">Call agent actions</h3><div className="grid grid-cols-2 gap-2"><a href={selectedCandidate.phone ? `tel:${selectedCandidate.phone}` : '#'} onClick={(e) => { if (!selectedCandidate.phone) e.preventDefault(); }} className={`inline-flex items-center justify-center gap-1 rounded-lg text-white text-xs font-bold py-2 ${selectedCandidate.phone ? 'bg-emerald-600' : 'bg-slate-400 cursor-not-allowed'}`}><PhoneCall className="h-3.5 w-3.5" />Call</a><a href={`mailto:${selectedCandidate.email}`} className="inline-flex items-center justify-center gap-1 rounded-lg bg-sky-600 text-white text-xs font-bold py-2"><Mail className="h-3.5 w-3.5" />Email</a><a href={(selectedCandidate.phone || '').replace(/\D/g, '').length >= 9 ? `https://wa.me/${(selectedCandidate.phone || '').replace(/\D/g, '')}` : '#'} onClick={(e) => { if ((selectedCandidate.phone || '').replace(/\D/g, '').length < 9) e.preventDefault(); }} target="_blank" rel="noreferrer" className={`inline-flex items-center justify-center gap-1 rounded-lg text-white text-xs font-bold py-2 ${(selectedCandidate.phone || '').replace(/\D/g, '').length >= 9 ? 'bg-green-700' : 'bg-slate-400 cursor-not-allowed'}`}><MessageCircle className="h-3.5 w-3.5" />WhatsApp</a>{activeModalApplicationId && <button onClick={() => void handleSendCodeEmail(activeModalApplicationId, selectedCandidate.email)} className="inline-flex items-center justify-center gap-1 rounded-lg bg-indigo-600 text-white text-xs font-bold py-2"><Mail className="h-3.5 w-3.5" />Send access code</button>}</div></div>
+                    <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3 flex items-center gap-1"><CalendarDays className="h-4 w-4 text-amber-600" />Follow-up and status</h3><label className="text-[10px] uppercase font-bold text-slate-500">Next follow-up date</label><input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} className="w-full mt-1 mb-2 px-3 py-2 rounded-lg border border-slate-200 text-xs" /><button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ nextFollowUpAt: followUpDate ? new Date(`${followUpDate}T09:00:00`).toISOString() : null })} className="w-full rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2">Save follow-up</button><div className="border-t border-slate-100 mt-3 pt-3"><label className="text-[10px] uppercase font-bold text-slate-500">Block reason</label><input value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Optional reason" className="w-full mt-1 mb-2 px-3 py-2 rounded-lg border border-slate-200 text-xs" />{candidateProfile.operations.isBlocked ? <button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ isBlocked: false })} className="w-full inline-flex justify-center items-center gap-1 rounded-lg bg-slate-700 text-white text-xs font-bold py-2"><RotateCcw className="h-3.5 w-3.5" />Restore candidate</button> : <button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ isBlocked: true, blockedReason: blockReason })} className="w-full inline-flex justify-center items-center gap-1 rounded-lg bg-rose-600 text-white text-xs font-bold py-2"><Ban className="h-3.5 w-3.5" />Block candidate</button>}</div></div>
+                    <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3 flex items-center gap-1"><StickyNote className="h-4 w-4 text-indigo-600" />Call notes</h3><textarea value={candidateNote} onChange={(e) => setCandidateNote(e.target.value)} placeholder="Record the outcome, commitment, or next step..." rows={3} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs resize-y" /><button disabled={!candidateNote.trim() || savingCandidateOperation} onClick={() => void addCandidateNote()} className="mt-2 w-full rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold py-2">Save note</button><div className="mt-3 space-y-2 max-h-40 overflow-y-auto">{candidateProfile.operations.notes.map((note) => <div key={note.id} className="rounded-lg bg-slate-50 border border-slate-200 p-2 text-xs"><p className="text-slate-700 whitespace-pre-wrap">{note.text}</p><p className="text-[10px] text-slate-400 mt-1">{new Date(note.createdAt).toLocaleString()}</p></div>)}</div></div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

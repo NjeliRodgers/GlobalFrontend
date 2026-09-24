@@ -145,6 +145,11 @@ export interface CandidateDirectoryRow {
   actionTags?: string[];
   daysSinceRegistration?: number;
   daysSinceLastActivity?: number | null;
+  isBlocked?: boolean;
+  blockedAt?: string | null;
+  blockedReason?: string | null;
+  nextFollowUpAt?: string | null;
+  notesCount?: number;
 }
 
 export interface CandidatesDirectoryAnalytics {
@@ -221,6 +226,7 @@ export interface CandidatesDirectoryFilters {
   sortBy?: 'registeredAt' | 'name' | 'totalApplications' | 'totalPaidKsh' | 'lastAppliedAt' | 'lastPaymentAt';
   sortOrder?: 'asc' | 'desc';
   limit?: number;
+  includeBlocked?: boolean;
 }
 
 export interface CandidatesDirectoryResponse {
@@ -294,6 +300,7 @@ export async function fetchCandidatesDirectoryReport(filters?: CandidatesDirecto
     if (filters?.sortBy) params.set('sortBy', filters.sortBy);
     if (filters?.sortOrder) params.set('sortOrder', filters.sortOrder);
     if (typeof filters?.limit === 'number') params.set('limit', String(filters.limit));
+    if (typeof filters?.includeBlocked === 'boolean') params.set('includeBlocked', String(filters.includeBlocked));
 
     const query = params.toString();
     const res = await apiFetch(`/users/candidates/directory${query ? `?${query}` : ''}`);

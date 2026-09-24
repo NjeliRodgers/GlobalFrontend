@@ -11,7 +11,6 @@ import {
   FolderLock,
   Sliders,
   Wallet,
-  LifeBuoy,
   UserRound,
   Users
 } from 'lucide-react';
@@ -32,7 +31,6 @@ const NAV_ITEMS = [
   { tab: 'document_vault', label: ' Document storage Vault', icon: FolderLock, iconColor: 'text-sky-400' },
   { tab: 'team_rbac', label: 'RBAC & Team Access Control', icon: ShieldCheck, iconColor: 'text-rose-400' },
   { tab: 'apex_recruiter', label: 'Atesta System Admin Control', icon: Sliders, iconColor: 'text-purple-400' },
-  { tab: 'candidate_control_panel', label: 'Candidate Control Panel', icon: LifeBuoy, iconColor: 'text-teal-400' },
   { tab: 'site_content_admin', label: 'Public Pages Editor', icon: PanelsTopLeft, iconColor: 'text-sky-300', adminOnly: true },
 ];
 

@@ -53,6 +53,13 @@ export interface SupportProfile {
   atestaAccount: { id: string; isActive: boolean; createdAt: string | null } | null;
   applications: SupportApplication[];
   emailHistory: EmailLog[];
+  operations: {
+    isBlocked: boolean;
+    blockedAt: string | null;
+    blockedReason: string | null;
+    nextFollowUpAt: string | null;
+    notes: Array<{ id: string; text: string; createdAt: string; createdBy?: string }>;
+  };
 }
 
 export async function fetchCandidateSupportProfile(email: string): Promise<SupportProfile> {
@@ -95,4 +102,22 @@ export async function assumeSupportItemPaid(payload: {
     message: String(data.message || 'Payment status updated.'),
     transactionRef: data.transactionRef || null
   };
+}
+
+export type CandidateOperationsUpdate = {
+  isBlocked?: boolean;
+  blockedReason?: string;
+  nextFollowUpAt?: string | null;
+  notes?: SupportProfile['operations']['notes'];
+};
+
+export async function updateCandidateOperations(payload: CandidateOperationsUpdate & { candidateEmail: string }) {
+  const res = await apiFetch('/users/candidates/operations', {
+    method: 'PATCH',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to update candidate operations.');
+  return data.operations as SupportProfile['operations'];
 }
