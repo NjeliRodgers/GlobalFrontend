@@ -6,10 +6,13 @@ import {
   CandidatesDirectoryFilters
 } from '../api/usersApi';
 import {
+  createCandidateApplicationAndSendAccessCode,
   sendApplicationAccessCodeEmail,
   sendApplicationReviewEmail,
   sendApplicationAcceptanceEmail
 } from '../api/applicationsApi';
+import { fetchJobs } from '../api/jobsApi';
+import { Job } from '../types';
 import {
   Search,
   Users,
@@ -25,15 +28,14 @@ import {
   Eye,
   X,
   Loader2,
-  PhoneCall,
   Mail,
-  MessageCircle,
   CalendarDays,
   StickyNote,
   Ban,
   RotateCcw,
   BookOpen,
-  GraduationCap
+  GraduationCap,
+  UserPlus
 } from 'lucide-react';
 import { fetchCandidateSupportProfile, SupportProfile, updateCandidateOperations, CandidateOperationsUpdate } from '../api/supportApi';
 
@@ -41,6 +43,12 @@ interface CandidatesDirectoryPageProps {
   initialJobId?: string;
   initialJobTitle?: string;
 }
+
+type UiToast = {
+  id: string;
+  kind: 'success' | 'error' | 'info';
+  message: string;
+};
 
 const EMPTY_ANALYTICS: CandidatesDirectoryAnalytics = {
   fromDate: null,
@@ -116,6 +124,20 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
   const [codeEmailStatusByAppId, setCodeEmailStatusByAppId] = useState<Record<string, { ok: boolean; message: string }>>({});
   const [sendingManualEmail, setSendingManualEmail] = useState<string | null>(null);
   const [manualEmailStatusByAppId, setManualEmailStatusByAppId] = useState<Record<string, { ok: boolean; message: string }>>({});
+  const [toasts, setToasts] = useState<UiToast[]>([]);
+
+  const [showApplyOnBehalfModal, setShowApplyOnBehalfModal] = useState(false);
+  const [applyOnBehalfLoading, setApplyOnBehalfLoading] = useState(false);
+  const [applyOnBehalfError, setApplyOnBehalfError] = useState('');
+  const [activeJobs, setActiveJobs] = useState<Job[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(false);
+  const [applyOnBehalfForm, setApplyOnBehalfForm] = useState({
+    candidateName: '',
+    candidateEmail: '',
+    candidatePhone: '',
+    candidateLocation: '',
+    jobId: ''
+  });
 
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -124,6 +146,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
   const [hasPayments, setHasPayments] = useState<'any' | 'yes' | 'no'>('any');
   const [hasApplications, setHasApplications] = useState<'any' | 'yes' | 'no'>('any');
   const [platformActive, setPlatformActive] = useState<'any' | 'yes' | 'no'>('any');
+  const [followUpFilter, setFollowUpFilter] = useState<'any' | 'overdue' | 'today' | 'upcoming_7' | 'scheduled' | 'none'>('any');
   const [includeBlocked, setIncludeBlocked] = useState(false);
   const [minApplications, setMinApplications] = useState('');
   const [maxApplications, setMaxApplications] = useState('');
@@ -135,6 +158,14 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     if (value === 'yes') return true;
     if (value === 'no') return false;
     return undefined;
+  };
+
+  const showToast = (kind: UiToast['kind'], message: string) => {
+    const id = `toast-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    setToasts((prev) => [...prev, { id, kind, message }]);
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 2600);
   };
 
   const buildCurrentFilters = (): CandidatesDirectoryFilters => ({
@@ -154,9 +185,12 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     includeBlocked
   });
 
-  const loadData = async (filters?: CandidatesDirectoryFilters) => {
-    setLoading(true);
-    setLoadError('');
+  const loadData = async (filters?: CandidatesDirectoryFilters, options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
+    if (!silent) {
+      setLoading(true);
+      setLoadError('');
+    }
     const requestFilters: CandidatesDirectoryFilters = {
       ...(initialJobId ? { jobId: initialJobId } : {}),
       ...(filters || {})
@@ -166,9 +200,15 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
       setRows(data.candidates);
       setPeriodAnalytics(data.analytics || EMPTY_ANALYTICS);
     } catch (error: any) {
-      setLoadError(error?.message || 'Unable to load candidates directory.');
+      if (silent) {
+        showToast('error', error?.message || 'Unable to refresh candidates.');
+      } else {
+        setLoadError(error?.message || 'Unable to load candidates directory.');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -177,7 +217,8 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
   }, [initialJobId]);
 
   const applyFilters = async () => {
-    await loadData(buildCurrentFilters());
+    await loadData(buildCurrentFilters(), { silent: true });
+    showToast('info', 'Filters applied.');
   };
 
   const clearAllFilters = async () => {
@@ -188,6 +229,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     setHasPayments('any');
     setHasApplications('any');
     setPlatformActive('any');
+    setFollowUpFilter('any');
     setMinApplications('');
     setMaxApplications('');
     setMinTotalPaidKsh('');
@@ -196,7 +238,8 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     setSearch('');
     setIncludeBlocked(false);
     setSelectedActionId('all');
-    await loadData({ includeBlocked: false });
+    await loadData({ includeBlocked: false }, { silent: true });
+    showToast('info', 'Filters reset.');
   };
 
   const formatCurrency = (value: number) =>
@@ -206,9 +249,58 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
       maximumFractionDigits: 0
     }).format(value || 0);
 
+  const getFollowUpMeta = (nextFollowUpAt?: string | null) => {
+    if (!nextFollowUpAt) {
+      return {
+        label: 'Not scheduled',
+        tone: 'bg-slate-100 text-slate-600 border-slate-200'
+      };
+    }
+
+    const date = new Date(nextFollowUpAt);
+    if (Number.isNaN(date.getTime())) {
+      return {
+        label: 'Invalid date',
+        tone: 'bg-rose-50 text-rose-700 border-rose-200'
+      };
+    }
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const targetStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diffDays = Math.floor((targetStart.getTime() - todayStart.getTime()) / (24 * 60 * 60 * 1000));
+
+    if (diffDays < 0) {
+      return {
+        label: `Overdue by ${Math.abs(diffDays)}d`,
+        tone: 'bg-rose-50 text-rose-700 border-rose-200'
+      };
+    }
+
+    if (diffDays === 0) {
+      return {
+        label: 'Due today',
+        tone: 'bg-amber-50 text-amber-700 border-amber-200'
+      };
+    }
+
+    if (diffDays <= 7) {
+      return {
+        label: `In ${diffDays}d`,
+        tone: 'bg-indigo-50 text-indigo-700 border-indigo-200'
+      };
+    }
+
+    return {
+      label: date.toLocaleDateString(),
+      tone: 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    };
+  };
+
   const copyCode = async (code: string) => {
     await navigator.clipboard.writeText(code);
     setCopiedCode(code);
+    showToast('success', 'Access code copied to clipboard.');
     window.setTimeout(() => setCopiedCode(null), 1800);
   };
 
@@ -222,24 +314,27 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
 
     try {
       const result = await sendApplicationAccessCodeEmail(applicationId);
+      const message = result.delivered
+        ? `Access-code email sent to ${candidateEmail}.`
+        : `Send attempted but delivery was not confirmed for ${candidateEmail}.`;
       setCodeEmailStatusByAppId((prev) => ({
         ...prev,
         [applicationId]: {
           ok: result.delivered,
-          message: result.delivered
-            ? `Access-code email sent to ${candidateEmail}.`
-            : `Send attempted but delivery was not confirmed for ${candidateEmail}.`
+          message
         }
       }));
-      await loadData(buildCurrentFilters());
+      showToast(result.delivered ? 'success' : 'info', message);
     } catch (error: any) {
+      const message = error?.message || 'Failed to send access-code email.';
       setCodeEmailStatusByAppId((prev) => ({
         ...prev,
         [applicationId]: {
           ok: false,
-          message: error?.message || 'Failed to send access-code email.'
+          message
         }
       }));
+      showToast('error', message);
     } finally {
       setSendingCodeEmailForAppId(null);
     }
@@ -253,15 +348,19 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
       const result = kind === 'review'
         ? await sendApplicationReviewEmail(applicationId)
         : await sendApplicationAcceptanceEmail(applicationId);
+      const message = result.delivered ? 'Email sent instantly.' : 'Email was not delivered.';
       setManualEmailStatusByAppId((prev) => ({
         ...prev,
-        [applicationId]: { ok: result.delivered, message: result.delivered ? 'Email sent instantly.' : 'Email was not delivered.' }
+        [applicationId]: { ok: result.delivered, message }
       }));
+      showToast(result.delivered ? 'success' : 'info', message);
     } catch (err: any) {
+      const message = err.message || 'Failed to send email.';
       setManualEmailStatusByAppId((prev) => ({
         ...prev,
-        [applicationId]: { ok: false, message: err.message || 'Failed to send email.' }
+        [applicationId]: { ok: false, message }
       }));
+      showToast('error', message);
     } finally {
       setSendingManualEmail(null);
     }
@@ -300,7 +399,34 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     try {
       const operations = await updateCandidateOperations({ candidateEmail: selectedCandidate.email, ...payload });
       setCandidateProfile((current) => current ? { ...current, operations } : current);
-      await loadData(buildCurrentFilters());
+      setRows((prev) => prev
+        .map((row) => {
+          if (row.email.toLowerCase() !== selectedCandidate.email.toLowerCase()) return row;
+          return {
+            ...row,
+            nextFollowUpAt: operations.nextFollowUpAt,
+            isBlocked: operations.isBlocked,
+            blockedAt: operations.blockedAt,
+            blockedReason: operations.blockedReason,
+            notesCount: operations.notes.length
+          };
+        })
+        .filter((row) => {
+          if (row.email.toLowerCase() !== selectedCandidate.email.toLowerCase()) return true;
+          return includeBlocked ? row.isBlocked : !row.isBlocked;
+        }));
+
+      if (payload.notes) {
+        showToast('success', 'Candidate notes saved.');
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, 'nextFollowUpAt')) {
+        showToast('success', payload.nextFollowUpAt ? 'Follow-up date updated.' : 'Follow-up date cleared.');
+      }
+      if (typeof payload.isBlocked === 'boolean') {
+        showToast('success', payload.isBlocked ? 'Candidate moved to blocked bin.' : 'Candidate restored to active list.');
+      }
+
+      void loadData(buildCurrentFilters(), { silent: true });
       if (!includeBlocked && payload.isBlocked === true) {
         closeCandidate();
       }
@@ -309,6 +435,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
       }
     } catch (error: any) {
       setCandidateProfileError(error?.message || 'Unable to save candidate action.');
+      showToast('error', error?.message || 'Unable to save candidate action.');
     } finally {
       setSavingCandidateOperation(false);
     }
@@ -323,6 +450,74 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     setCandidateNote('');
   };
 
+  const openApplyOnBehalfModal = async () => {
+    setApplyOnBehalfError('');
+    setShowApplyOnBehalfModal(true);
+    if (activeJobs.length > 0) return;
+
+    setJobsLoading(true);
+    try {
+      const jobs = await fetchJobs();
+      const openJobs = jobs
+        .filter((job) => job.status === 'active')
+        .sort((a, b) => a.title.localeCompare(b.title));
+      setActiveJobs(openJobs);
+    } catch (error: any) {
+      setApplyOnBehalfError(error?.message || 'Failed to load active jobs.');
+    } finally {
+      setJobsLoading(false);
+    }
+  };
+
+  const closeApplyOnBehalfModal = () => {
+    if (applyOnBehalfLoading) return;
+    setShowApplyOnBehalfModal(false);
+    setApplyOnBehalfError('');
+  };
+
+  const submitApplyOnBehalf = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setApplyOnBehalfError('');
+
+    const payload = {
+      candidateName: applyOnBehalfForm.candidateName.trim(),
+      candidateEmail: applyOnBehalfForm.candidateEmail.trim(),
+      candidatePhone: applyOnBehalfForm.candidatePhone.trim() || undefined,
+      candidateLocation: applyOnBehalfForm.candidateLocation.trim() || undefined,
+      jobId: applyOnBehalfForm.jobId
+    };
+
+    if (!payload.candidateName || !payload.candidateEmail || !payload.jobId) {
+      setApplyOnBehalfError('Candidate name, candidate email, and target job are required.');
+      return;
+    }
+
+    setApplyOnBehalfLoading(true);
+    try {
+      const result = await createCandidateApplicationAndSendAccessCode(payload);
+      const summary = result.delivered
+        ? `Application captured for ${payload.candidateEmail}. Access-code email sent. ${result.applicationCreated ? 'New application created.' : 'Existing application reused.'}`
+        : `Application captured for ${payload.candidateEmail}, but email delivery could not be confirmed.`;
+
+      showToast(result.delivered ? 'success' : 'info', summary);
+      setShowApplyOnBehalfModal(false);
+      setApplyOnBehalfForm({
+        candidateName: '',
+        candidateEmail: '',
+        candidatePhone: '',
+        candidateLocation: '',
+        jobId: ''
+      });
+
+      await loadData(buildCurrentFilters(), { silent: true });
+    } catch (error: any) {
+      setApplyOnBehalfError(error?.message || 'Failed to apply on behalf.');
+      showToast('error', error?.message || 'Failed to apply on behalf.');
+    } finally {
+      setApplyOnBehalfLoading(false);
+    }
+  };
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const byAction =
@@ -330,9 +525,9 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
         ? rows
         : rows.filter((row) => Array.isArray(row.actionTags) && row.actionTags.includes(selectedActionId));
 
-    if (!q) return byAction;
-
-    return byAction.filter((row) => {
+    const bySearch = !q
+      ? byAction
+      : byAction.filter((row) => {
       const inProfile =
         row.name.toLowerCase().includes(q) ||
         row.email.toLowerCase().includes(q) ||
@@ -344,7 +539,28 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
       );
       return inProfile || inApplications;
     });
-  }, [rows, search, selectedActionId]);
+
+    return bySearch.filter((row) => {
+      const followUp = row.nextFollowUpAt;
+      if (followUpFilter === 'any') return true;
+      if (followUpFilter === 'none') return !followUp;
+      if (!followUp) return false;
+
+      const date = new Date(followUp);
+      if (Number.isNaN(date.getTime())) return false;
+
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const targetStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const diffDays = Math.floor((targetStart.getTime() - todayStart.getTime()) / (24 * 60 * 60 * 1000));
+
+      if (followUpFilter === 'overdue') return diffDays < 0;
+      if (followUpFilter === 'today') return diffDays === 0;
+      if (followUpFilter === 'upcoming_7') return diffDays > 0 && diffDays <= 7;
+      if (followUpFilter === 'scheduled') return diffDays >= 0;
+      return true;
+    });
+  }, [rows, search, selectedActionId, followUpFilter]);
 
   const analytics = useMemo(() => {
     const totalCandidates = filtered.length;
@@ -361,6 +577,14 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
   }, [filtered]);
 
   const stageEntries = Object.entries(periodAnalytics.salesStageDistribution || {}).sort((a, b) => b[1] - a[1]);
+
+  const activeModalApplication = useMemo(() => {
+    if (!candidateProfile || candidateProfile.applications.length === 0) return null;
+    return (
+      candidateProfile.applications.find((app) => app.id === activeModalApplicationId) ||
+      candidateProfile.applications[0]
+    );
+  }, [candidateProfile, activeModalApplicationId]);
 
   return (
     <div className="space-y-6">
@@ -387,12 +611,20 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
           <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
             <SlidersHorizontal className="h-4 w-4 text-indigo-600" /> Dynamic Filters
           </h3>
-          <button
-            onClick={clearAllFilters}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg"
-          >
-            <RefreshCw className="h-3.5 w-3.5" /> Reset
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => void openApplyOnBehalfModal()}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg"
+            >
+              <UserPlus className="h-3.5 w-3.5" /> Apply On Behalf
+            </button>
+            <button
+              onClick={clearAllFilters}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg"
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> Reset
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -475,6 +707,19 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
             <option value="any">Platform Account: Any</option>
             <option value="yes">Platform active</option>
             <option value="no">Platform inactive</option>
+          </select>
+
+          <select
+            value={followUpFilter}
+            onChange={(e) => setFollowUpFilter(e.target.value as any)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="any">Follow-up: Any</option>
+            <option value="overdue">Follow-up: Overdue</option>
+            <option value="today">Follow-up: Due today</option>
+            <option value="upcoming_7">Follow-up: Next 7 days</option>
+            <option value="scheduled">Follow-up: Scheduled</option>
+            <option value="none">Follow-up: Not scheduled</option>
           </select>
 
           <select
@@ -792,6 +1037,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                   <th className="p-3">Platform Account</th>
                   <th className="p-3">Atesta</th>
                   <th className="p-3">Sales Stage</th>
+                  <th className="p-3">Next Follow-up</th>
                   <th className="p-3">Applications</th>
                   <th className="p-3">Paid</th>
                   <th className="p-3 text-right">Details</th>
@@ -826,6 +1072,16 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                           </span>
                         </td>
                         <td className="p-3 text-slate-700">{SALES_STAGE_LABELS[row.salesStage || ''] || row.salesStage || 'Unknown'}</td>
+                        <td className="p-3">
+                          {(() => {
+                            const followUpMeta = getFollowUpMeta(row.nextFollowUpAt || null);
+                            return (
+                              <span className={`inline-flex px-2 py-0.5 rounded-full border text-[10px] font-bold ${followUpMeta.tone}`}>
+                                {followUpMeta.label}
+                              </span>
+                            );
+                          })()}
+                        </td>
                         <td className="p-3 font-bold text-slate-800">{row.totalApplications}</td>
                         <td className="p-3 font-bold text-emerald-700">{formatCurrency(row.totalPaidKsh || 0)}</td>
                         <td className="p-3 text-right">
@@ -887,6 +1143,10 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                       {candidateProfile.applications.length === 0 ? <p className="text-xs text-slate-500">No job applications found.</p> : candidateProfile.applications.filter((app) => app.id === activeModalApplicationId || (!activeModalApplicationId && app === candidateProfile.applications[0])).map((app) => (
                         <div key={app.id} className="space-y-3">
                           <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-black text-slate-900">{app.jobTitle}</p><p className="text-xs text-slate-500">Applied {new Date(app.appliedAt).toLocaleDateString()} · <span className="font-bold text-indigo-700">{app.stage}</span></p></div><div className="text-right"><p className="text-xl font-black text-indigo-700">{app.readinessProgress.percentage}%</p><p className="text-[10px] text-slate-500">readiness</p></div></div>
+                          <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs">
+                            <div className="text-indigo-800 font-semibold">Access Code: <span className="font-mono tracking-wide">{app.voucher?.code || 'Not generated'}</span></div>
+                            <div className="text-indigo-700 mt-1">Package ID(s): {app.assignedPackages.length > 0 ? app.assignedPackages.map((pkg) => pkg.packageId).join(', ') : 'Not assigned'}</div>
+                          </div>
                           <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-indigo-600" style={{ width: `${app.readinessProgress.percentage}%` }} /></div>
                           <div className="grid grid-cols-2 gap-2 text-xs">{app.readinessProgress.items.map((item) => <div key={item.id} className={`rounded-lg border p-2 ${item.complete ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>{item.complete ? 'Complete' : 'Pending'} · {item.message}</div>)}</div>
                           {app.assignedPackages.map((pkg) => <div key={pkg.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-bold text-xs text-slate-900 flex items-center gap-1"><BookOpen className="h-3.5 w-3.5 text-indigo-600" />{pkg.name}</p><div className="mt-2 space-y-1">{[...pkg.courses.map((item) => ({ ...item, type: 'Course' })), ...pkg.exams.map((item) => ({ ...item, type: 'Exam' }))].map((item) => <div key={`${item.type}-${item.id}`} className="flex items-center justify-between gap-2 text-[11px]"><span className="flex items-center gap-1"><GraduationCap className="h-3 w-3 text-slate-400" />{item.type}: {item.name}</span><span className={`font-bold ${item.isPaid ? 'text-emerald-700' : 'text-amber-700'}`}>{item.isPaid ? 'Paid / unlocked' : item.enrollmentStatus || 'Not paid'}</span></div>)}</div></div>)}
@@ -897,7 +1157,50 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                   </div>
 
                   <div className="space-y-4">
-                    <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3">Call agent actions</h3><div className="grid grid-cols-2 gap-2"><a href={selectedCandidate.phone ? `tel:${selectedCandidate.phone}` : '#'} onClick={(e) => { if (!selectedCandidate.phone) e.preventDefault(); }} className={`inline-flex items-center justify-center gap-1 rounded-lg text-white text-xs font-bold py-2 ${selectedCandidate.phone ? 'bg-emerald-600' : 'bg-slate-400 cursor-not-allowed'}`}><PhoneCall className="h-3.5 w-3.5" />Call</a><a href={`mailto:${selectedCandidate.email}`} className="inline-flex items-center justify-center gap-1 rounded-lg bg-sky-600 text-white text-xs font-bold py-2"><Mail className="h-3.5 w-3.5" />Email</a><a href={(selectedCandidate.phone || '').replace(/\D/g, '').length >= 9 ? `https://wa.me/${(selectedCandidate.phone || '').replace(/\D/g, '')}` : '#'} onClick={(e) => { if ((selectedCandidate.phone || '').replace(/\D/g, '').length < 9) e.preventDefault(); }} target="_blank" rel="noreferrer" className={`inline-flex items-center justify-center gap-1 rounded-lg text-white text-xs font-bold py-2 ${(selectedCandidate.phone || '').replace(/\D/g, '').length >= 9 ? 'bg-green-700' : 'bg-slate-400 cursor-not-allowed'}`}><MessageCircle className="h-3.5 w-3.5" />WhatsApp</a>{activeModalApplicationId && <button onClick={() => void handleSendCodeEmail(activeModalApplicationId, selectedCandidate.email)} className="inline-flex items-center justify-center gap-1 rounded-lg bg-indigo-600 text-white text-xs font-bold py-2"><Mail className="h-3.5 w-3.5" />Send access code</button>}</div></div>
+                    <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3">Candidate Contact and Profile</h3><div className="space-y-2 text-xs"><p className="text-slate-700"><span className="font-semibold text-slate-900">Full Name:</span> {candidateProfile.candidate.name}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Email:</span> {candidateProfile.candidate.email}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Phone:</span> {candidateProfile.candidate.phone || 'Not provided'}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Location:</span> {candidateProfile.candidate.location || 'Not provided'}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Platform account:</span> {candidateProfile.candidate.hasPlatformAccount ? (candidateProfile.candidate.platformAccountActive ? 'Active' : 'Inactive') : 'Not registered'}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Joined:</span> {candidateProfile.candidate.platformJoinedAt ? new Date(candidateProfile.candidate.platformJoinedAt).toLocaleDateString() : 'N/A'}</p></div></div>
+                    <div className="bg-white rounded-xl border border-slate-200 p-4">
+                      <h3 className="font-black text-sm text-slate-900 mb-3">Candidate Email Actions</h3>
+                      {!activeModalApplication ? (
+                        <p className="text-xs text-slate-500">No application selected for this candidate.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => void handleSendCodeEmail(activeModalApplication.id, candidateProfile.candidate.email)}
+                            disabled={sendingCodeEmailForAppId === activeModalApplication.id}
+                            className="w-full inline-flex items-center justify-center gap-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold py-2"
+                          >
+                            {sendingCodeEmailForAppId === activeModalApplication.id ? 'Sending Atesta Instructions...' : 'Send Atesta Instructions'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleSendManualApplicationEmail(activeModalApplication.id, 'review')}
+                            disabled={sendingManualEmail === `review:${activeModalApplication.id}`}
+                            className="w-full inline-flex items-center justify-center gap-1 rounded-lg bg-sky-600 hover:bg-sky-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold py-2"
+                          >
+                            {sendingManualEmail === `review:${activeModalApplication.id}` ? 'Sending First Email...' : 'Send First Email'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleSendManualApplicationEmail(activeModalApplication.id, 'acceptance')}
+                            disabled={sendingManualEmail === `acceptance:${activeModalApplication.id}`}
+                            className="w-full inline-flex items-center justify-center gap-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold py-2"
+                          >
+                            {sendingManualEmail === `acceptance:${activeModalApplication.id}` ? 'Sending Second Email...' : 'Send Second Email'}
+                          </button>
+                          {codeEmailStatusByAppId[activeModalApplication.id]?.message && (
+                            <p className={`text-[11px] ${codeEmailStatusByAppId[activeModalApplication.id].ok ? 'text-emerald-700' : 'text-rose-700'}`}>
+                              {codeEmailStatusByAppId[activeModalApplication.id].message}
+                            </p>
+                          )}
+                          {manualEmailStatusByAppId[activeModalApplication.id]?.message && (
+                            <p className={`text-[11px] ${manualEmailStatusByAppId[activeModalApplication.id].ok ? 'text-emerald-700' : 'text-rose-700'}`}>
+                              {manualEmailStatusByAppId[activeModalApplication.id].message}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3 flex items-center gap-1"><CalendarDays className="h-4 w-4 text-amber-600" />Follow-up and status</h3><label className="text-[10px] uppercase font-bold text-slate-500">Next follow-up date</label><input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} className="w-full mt-1 mb-2 px-3 py-2 rounded-lg border border-slate-200 text-xs" /><button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ nextFollowUpAt: followUpDate ? new Date(`${followUpDate}T09:00:00`).toISOString() : null })} className="w-full rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2">Save follow-up</button><div className="border-t border-slate-100 mt-3 pt-3"><label className="text-[10px] uppercase font-bold text-slate-500">Block reason</label><input value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Optional reason" className="w-full mt-1 mb-2 px-3 py-2 rounded-lg border border-slate-200 text-xs" />{candidateProfile.operations.isBlocked ? <button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ isBlocked: false })} className="w-full inline-flex justify-center items-center gap-1 rounded-lg bg-slate-700 text-white text-xs font-bold py-2"><RotateCcw className="h-3.5 w-3.5" />Restore candidate</button> : <button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ isBlocked: true, blockedReason: blockReason })} className="w-full inline-flex justify-center items-center gap-1 rounded-lg bg-rose-600 text-white text-xs font-bold py-2"><Ban className="h-3.5 w-3.5" />Block candidate</button>}</div></div>
                     <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3 flex items-center gap-1"><StickyNote className="h-4 w-4 text-indigo-600" />Call notes</h3><textarea value={candidateNote} onChange={(e) => setCandidateNote(e.target.value)} placeholder="Record the outcome, commitment, or next step..." rows={3} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs resize-y" /><button disabled={!candidateNote.trim() || savingCandidateOperation} onClick={() => void addCandidateNote()} className="mt-2 w-full rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold py-2">Save note</button><div className="mt-3 space-y-2 max-h-40 overflow-y-auto">{candidateProfile.operations.notes.map((note) => <div key={note.id} className="rounded-lg bg-slate-50 border border-slate-200 p-2 text-xs"><p className="text-slate-700 whitespace-pre-wrap">{note.text}</p><p className="text-[10px] text-slate-400 mt-1">{new Date(note.createdAt).toLocaleString()}</p></div>)}</div></div>
                   </div>
@@ -907,6 +1210,91 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
           </div>
         </div>
       )}
+
+      {showApplyOnBehalfModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60" role="dialog" aria-modal="true" aria-label="Apply on behalf">
+          <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">Apply On Behalf</h3>
+                <p className="text-xs text-slate-500">Create a candidate application and send Atesta access code in one step.</p>
+              </div>
+              <button type="button" onClick={closeApplyOnBehalfModal} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100" title="Close"><X className="h-4 w-4" /></button>
+            </div>
+
+            <form onSubmit={(e) => void submitApplyOnBehalf(e)} className="p-5 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  value={applyOnBehalfForm.candidateName}
+                  onChange={(e) => setApplyOnBehalfForm((prev) => ({ ...prev, candidateName: e.target.value }))}
+                  placeholder="Candidate full name *"
+                  className="px-3 py-2 rounded-lg border border-slate-200 text-xs"
+                />
+                <input
+                  type="email"
+                  value={applyOnBehalfForm.candidateEmail}
+                  onChange={(e) => setApplyOnBehalfForm((prev) => ({ ...prev, candidateEmail: e.target.value }))}
+                  placeholder="Candidate email *"
+                  className="px-3 py-2 rounded-lg border border-slate-200 text-xs"
+                />
+                <input
+                  value={applyOnBehalfForm.candidatePhone}
+                  onChange={(e) => setApplyOnBehalfForm((prev) => ({ ...prev, candidatePhone: e.target.value }))}
+                  placeholder="Candidate phone"
+                  className="px-3 py-2 rounded-lg border border-slate-200 text-xs"
+                />
+                <input
+                  value={applyOnBehalfForm.candidateLocation}
+                  onChange={(e) => setApplyOnBehalfForm((prev) => ({ ...prev, candidateLocation: e.target.value }))}
+                  placeholder="Candidate location"
+                  className="px-3 py-2 rounded-lg border border-slate-200 text-xs"
+                />
+              </div>
+
+              <select
+                value={applyOnBehalfForm.jobId}
+                onChange={(e) => setApplyOnBehalfForm((prev) => ({ ...prev, jobId: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs"
+                disabled={jobsLoading}
+              >
+                <option value="">{jobsLoading ? 'Loading active jobs...' : 'Select target job *'}</option>
+                {activeJobs.map((job) => (
+                  <option key={job.id} value={job.id}>{job.title}</option>
+                ))}
+              </select>
+
+              {applyOnBehalfError && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+                  {applyOnBehalfError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button type="button" onClick={closeApplyOnBehalfModal} className="px-3 py-2 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold">Cancel</button>
+                <button type="submit" disabled={applyOnBehalfLoading} className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold disabled:opacity-50">
+                  {applyOnBehalfLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {applyOnBehalfLoading ? 'Submitting...' : 'Create Application + Send Code'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <div className="fixed top-4 right-4 z-[70] flex w-[320px] max-w-[90vw] flex-col gap-2 pointer-events-none">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`pointer-events-auto rounded-xl border px-3 py-2 text-xs font-semibold shadow-lg ${{
+              success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+              error: 'border-rose-200 bg-rose-50 text-rose-700',
+              info: 'border-indigo-200 bg-indigo-50 text-indigo-700'
+            }[toast.kind]}`}
+          >
+            {toast.message}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
