@@ -578,14 +578,6 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
 
   const stageEntries = Object.entries(periodAnalytics.salesStageDistribution || {}).sort((a, b) => b[1] - a[1]);
 
-  const activeModalApplication = useMemo(() => {
-    if (!candidateProfile || candidateProfile.applications.length === 0) return null;
-    return (
-      candidateProfile.applications.find((app) => app.id === activeModalApplicationId) ||
-      candidateProfile.applications[0]
-    );
-  }, [candidateProfile, activeModalApplicationId]);
-
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
@@ -1147,6 +1139,45 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                             <div className="text-indigo-800 font-semibold">Access Code: <span className="font-mono tracking-wide">{app.voucher?.code || 'Not generated'}</span></div>
                             <div className="text-indigo-700 mt-1">Package ID(s): {app.assignedPackages.length > 0 ? app.assignedPackages.map((pkg) => pkg.packageId).join(', ') : 'Not assigned'}</div>
                           </div>
+                          <div className="rounded-lg border border-slate-200 bg-white px-3 py-3 text-xs space-y-2">
+                            <h4 className="font-bold text-slate-900">Application Email Actions</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void handleSendCodeEmail(app.id, candidateProfile.candidate.email)}
+                                disabled={sendingCodeEmailForAppId === app.id}
+                                className="inline-flex items-center justify-center gap-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[11px] font-bold py-2"
+                              >
+                                {sendingCodeEmailForAppId === app.id ? 'Sending Atesta Instructions...' : 'Send Atesta Instructions'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleSendManualApplicationEmail(app.id, 'review')}
+                                disabled={sendingManualEmail === `review:${app.id}`}
+                                className="inline-flex items-center justify-center gap-1 rounded-lg bg-sky-600 hover:bg-sky-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[11px] font-bold py-2"
+                              >
+                                {sendingManualEmail === `review:${app.id}` ? 'Sending Review Summary...' : 'Send Review Summary'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleSendManualApplicationEmail(app.id, 'acceptance')}
+                                disabled={sendingManualEmail === `acceptance:${app.id}`}
+                                className="inline-flex items-center justify-center gap-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-[11px] font-bold py-2"
+                              >
+                                {sendingManualEmail === `acceptance:${app.id}` ? 'Sending Acceptance Update...' : 'Send Acceptance Update'}
+                              </button>
+                            </div>
+                            {codeEmailStatusByAppId[app.id]?.message && (
+                              <p className={`text-[11px] ${codeEmailStatusByAppId[app.id].ok ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                {codeEmailStatusByAppId[app.id].message}
+                              </p>
+                            )}
+                            {manualEmailStatusByAppId[app.id]?.message && (
+                              <p className={`text-[11px] ${manualEmailStatusByAppId[app.id].ok ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                {manualEmailStatusByAppId[app.id].message}
+                              </p>
+                            )}
+                          </div>
                           <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-indigo-600" style={{ width: `${app.readinessProgress.percentage}%` }} /></div>
                           <div className="grid grid-cols-2 gap-2 text-xs">{app.readinessProgress.items.map((item) => <div key={item.id} className={`rounded-lg border p-2 ${item.complete ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>{item.complete ? 'Complete' : 'Pending'} · {item.message}</div>)}</div>
                           {app.assignedPackages.map((pkg) => <div key={pkg.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-bold text-xs text-slate-900 flex items-center gap-1"><BookOpen className="h-3.5 w-3.5 text-indigo-600" />{pkg.name}</p><div className="mt-2 space-y-1">{[...pkg.courses.map((item) => ({ ...item, type: 'Course' })), ...pkg.exams.map((item) => ({ ...item, type: 'Exam' }))].map((item) => <div key={`${item.type}-${item.id}`} className="flex items-center justify-between gap-2 text-[11px]"><span className="flex items-center gap-1"><GraduationCap className="h-3 w-3 text-slate-400" />{item.type}: {item.name}</span><span className={`font-bold ${item.isPaid ? 'text-emerald-700' : 'text-amber-700'}`}>{item.isPaid ? 'Paid / unlocked' : item.enrollmentStatus || 'Not paid'}</span></div>)}</div></div>)}
@@ -1158,49 +1189,6 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
 
                   <div className="space-y-4">
                     <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3">Candidate Contact and Profile</h3><div className="space-y-2 text-xs"><p className="text-slate-700"><span className="font-semibold text-slate-900">Full Name:</span> {candidateProfile.candidate.name}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Email:</span> {candidateProfile.candidate.email}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Phone:</span> {candidateProfile.candidate.phone || 'Not provided'}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Location:</span> {candidateProfile.candidate.location || 'Not provided'}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Platform account:</span> {candidateProfile.candidate.hasPlatformAccount ? (candidateProfile.candidate.platformAccountActive ? 'Active' : 'Inactive') : 'Not registered'}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Joined:</span> {candidateProfile.candidate.platformJoinedAt ? new Date(candidateProfile.candidate.platformJoinedAt).toLocaleDateString() : 'N/A'}</p></div></div>
-                    <div className="bg-white rounded-xl border border-slate-200 p-4">
-                      <h3 className="font-black text-sm text-slate-900 mb-3">Candidate Email Actions</h3>
-                      {!activeModalApplication ? (
-                        <p className="text-xs text-slate-500">No application selected for this candidate.</p>
-                      ) : (
-                        <div className="space-y-2">
-                          <button
-                            type="button"
-                            onClick={() => void handleSendCodeEmail(activeModalApplication.id, candidateProfile.candidate.email)}
-                            disabled={sendingCodeEmailForAppId === activeModalApplication.id}
-                            className="w-full inline-flex items-center justify-center gap-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold py-2"
-                          >
-                            {sendingCodeEmailForAppId === activeModalApplication.id ? 'Sending Atesta Instructions...' : 'Send Atesta Instructions'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleSendManualApplicationEmail(activeModalApplication.id, 'review')}
-                            disabled={sendingManualEmail === `review:${activeModalApplication.id}`}
-                            className="w-full inline-flex items-center justify-center gap-1 rounded-lg bg-sky-600 hover:bg-sky-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold py-2"
-                          >
-                            {sendingManualEmail === `review:${activeModalApplication.id}` ? 'Sending First Email...' : 'Send First Email'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleSendManualApplicationEmail(activeModalApplication.id, 'acceptance')}
-                            disabled={sendingManualEmail === `acceptance:${activeModalApplication.id}`}
-                            className="w-full inline-flex items-center justify-center gap-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold py-2"
-                          >
-                            {sendingManualEmail === `acceptance:${activeModalApplication.id}` ? 'Sending Second Email...' : 'Send Second Email'}
-                          </button>
-                          {codeEmailStatusByAppId[activeModalApplication.id]?.message && (
-                            <p className={`text-[11px] ${codeEmailStatusByAppId[activeModalApplication.id].ok ? 'text-emerald-700' : 'text-rose-700'}`}>
-                              {codeEmailStatusByAppId[activeModalApplication.id].message}
-                            </p>
-                          )}
-                          {manualEmailStatusByAppId[activeModalApplication.id]?.message && (
-                            <p className={`text-[11px] ${manualEmailStatusByAppId[activeModalApplication.id].ok ? 'text-emerald-700' : 'text-rose-700'}`}>
-                              {manualEmailStatusByAppId[activeModalApplication.id].message}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
                     <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3 flex items-center gap-1"><CalendarDays className="h-4 w-4 text-amber-600" />Follow-up and status</h3><label className="text-[10px] uppercase font-bold text-slate-500">Next follow-up date</label><input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} className="w-full mt-1 mb-2 px-3 py-2 rounded-lg border border-slate-200 text-xs" /><button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ nextFollowUpAt: followUpDate ? new Date(`${followUpDate}T09:00:00`).toISOString() : null })} className="w-full rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2">Save follow-up</button><div className="border-t border-slate-100 mt-3 pt-3"><label className="text-[10px] uppercase font-bold text-slate-500">Block reason</label><input value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Optional reason" className="w-full mt-1 mb-2 px-3 py-2 rounded-lg border border-slate-200 text-xs" />{candidateProfile.operations.isBlocked ? <button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ isBlocked: false })} className="w-full inline-flex justify-center items-center gap-1 rounded-lg bg-slate-700 text-white text-xs font-bold py-2"><RotateCcw className="h-3.5 w-3.5" />Restore candidate</button> : <button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ isBlocked: true, blockedReason: blockReason })} className="w-full inline-flex justify-center items-center gap-1 rounded-lg bg-rose-600 text-white text-xs font-bold py-2"><Ban className="h-3.5 w-3.5" />Block candidate</button>}</div></div>
                     <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3 flex items-center gap-1"><StickyNote className="h-4 w-4 text-indigo-600" />Call notes</h3><textarea value={candidateNote} onChange={(e) => setCandidateNote(e.target.value)} placeholder="Record the outcome, commitment, or next step..." rows={3} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs resize-y" /><button disabled={!candidateNote.trim() || savingCandidateOperation} onClick={() => void addCandidateNote()} className="mt-2 w-full rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold py-2">Save note</button><div className="mt-3 space-y-2 max-h-40 overflow-y-auto">{candidateProfile.operations.notes.map((note) => <div key={note.id} className="rounded-lg bg-slate-50 border border-slate-200 p-2 text-xs"><p className="text-slate-700 whitespace-pre-wrap">{note.text}</p><p className="text-[10px] text-slate-400 mt-1">{new Date(note.createdAt).toLocaleString()}</p></div>)}</div></div>
                   </div>
