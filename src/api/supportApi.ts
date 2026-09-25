@@ -57,6 +57,8 @@ export interface SupportProfile {
     isBlocked: boolean;
     blockedAt: string | null;
     blockedReason: string | null;
+    isPromisedToPay: boolean;
+    promisedToPayAt: string | null;
     nextFollowUpAt: string | null;
     notes: Array<{ id: string; text: string; createdAt: string; createdBy?: string }>;
   };
@@ -107,6 +109,7 @@ export async function assumeSupportItemPaid(payload: {
 export type CandidateOperationsUpdate = {
   isBlocked?: boolean;
   blockedReason?: string;
+  isPromisedToPay?: boolean;
   nextFollowUpAt?: string | null;
   notes?: SupportProfile['operations']['notes'];
 };

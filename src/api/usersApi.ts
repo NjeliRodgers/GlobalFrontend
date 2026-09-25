@@ -148,6 +148,8 @@ export interface CandidateDirectoryRow {
   isBlocked?: boolean;
   blockedAt?: string | null;
   blockedReason?: string | null;
+  isPromisedToPay?: boolean;
+  promisedToPayAt?: string | null;
   nextFollowUpAt?: string | null;
   notesCount?: number;
 }

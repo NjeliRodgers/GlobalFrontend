@@ -402,12 +402,19 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
       setRows((prev) => prev
         .map((row) => {
           if (row.email.toLowerCase() !== selectedCandidate.email.toLowerCase()) return row;
+          const existingTags = Array.isArray(row.actionTags) ? row.actionTags : [];
+          const updatedTags = operations.isPromisedToPay
+            ? Array.from(new Set([...existingTags, 'promise_to_pay_follow_up']))
+            : existingTags.filter((tag) => tag !== 'promise_to_pay_follow_up');
           return {
             ...row,
             nextFollowUpAt: operations.nextFollowUpAt,
             isBlocked: operations.isBlocked,
             blockedAt: operations.blockedAt,
             blockedReason: operations.blockedReason,
+            isPromisedToPay: operations.isPromisedToPay,
+            promisedToPayAt: operations.promisedToPayAt,
+            actionTags: updatedTags,
             notesCount: operations.notes.length
           };
         })
@@ -424,6 +431,9 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
       }
       if (typeof payload.isBlocked === 'boolean') {
         showToast('success', payload.isBlocked ? 'Candidate moved to blocked bin.' : 'Candidate restored to active list.');
+      }
+      if (typeof payload.isPromisedToPay === 'boolean') {
+        showToast('success', payload.isPromisedToPay ? 'Candidate marked as Promise to Pay.' : 'Promise to Pay removed.');
       }
 
       void loadData(buildCurrentFilters(), { silent: true });
@@ -1044,6 +1054,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                           <div className="font-bold text-slate-900">{row.name}</div>
                           <div className="text-[10px] text-slate-500">{row.email}</div>
                           <div className="text-[10px] text-slate-400">{row.phone || 'No phone'} • {row.location || 'No location'}{row.age ? ` • Age ${row.age}` : ''}</div>
+                          {row.isPromisedToPay && <span className="inline-flex mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Promise to Pay</span>}
                         </td>
                         <td className="p-3">
                           <span
@@ -1108,6 +1119,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">{SALES_STAGE_LABELS[selectedCandidate.salesStage || ''] || selectedCandidate.salesStage || 'Unknown'}</span>
                     {candidateProfile?.operations.isBlocked && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">Blocked</span>}
+                    {candidateProfile?.operations.isPromisedToPay && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Promise to Pay</span>}
                   </div>
                 </div>
               </div>
@@ -1189,7 +1201,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
 
                   <div className="space-y-4">
                     <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3">Candidate Contact and Profile</h3><div className="space-y-2 text-xs"><p className="text-slate-700"><span className="font-semibold text-slate-900">Full Name:</span> {candidateProfile.candidate.name}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Email:</span> {candidateProfile.candidate.email}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Phone:</span> {candidateProfile.candidate.phone || 'Not provided'}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Location:</span> {candidateProfile.candidate.location || 'Not provided'}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Platform account:</span> {candidateProfile.candidate.hasPlatformAccount ? (candidateProfile.candidate.platformAccountActive ? 'Active' : 'Inactive') : 'Not registered'}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Joined:</span> {candidateProfile.candidate.platformJoinedAt ? new Date(candidateProfile.candidate.platformJoinedAt).toLocaleDateString() : 'N/A'}</p></div></div>
-                    <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3 flex items-center gap-1"><CalendarDays className="h-4 w-4 text-amber-600" />Follow-up and status</h3><label className="text-[10px] uppercase font-bold text-slate-500">Next follow-up date</label><input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} className="w-full mt-1 mb-2 px-3 py-2 rounded-lg border border-slate-200 text-xs" /><button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ nextFollowUpAt: followUpDate ? new Date(`${followUpDate}T09:00:00`).toISOString() : null })} className="w-full rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2">Save follow-up</button><div className="border-t border-slate-100 mt-3 pt-3"><label className="text-[10px] uppercase font-bold text-slate-500">Block reason</label><input value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Optional reason" className="w-full mt-1 mb-2 px-3 py-2 rounded-lg border border-slate-200 text-xs" />{candidateProfile.operations.isBlocked ? <button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ isBlocked: false })} className="w-full inline-flex justify-center items-center gap-1 rounded-lg bg-slate-700 text-white text-xs font-bold py-2"><RotateCcw className="h-3.5 w-3.5" />Restore candidate</button> : <button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ isBlocked: true, blockedReason: blockReason })} className="w-full inline-flex justify-center items-center gap-1 rounded-lg bg-rose-600 text-white text-xs font-bold py-2"><Ban className="h-3.5 w-3.5" />Block candidate</button>}</div></div>
+                    <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3 flex items-center gap-1"><CalendarDays className="h-4 w-4 text-amber-600" />Follow-up and status</h3><label className="text-[10px] uppercase font-bold text-slate-500">Next follow-up date</label><input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} className="w-full mt-1 mb-2 px-3 py-2 rounded-lg border border-slate-200 text-xs" /><button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ nextFollowUpAt: followUpDate ? new Date(`${followUpDate}T09:00:00`).toISOString() : null })} className="w-full rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2">Save follow-up</button><div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5"><p className="text-[10px] uppercase font-bold text-amber-700">Promise to pay</p><p className="text-[11px] text-amber-800 mt-0.5">{candidateProfile.operations.isPromisedToPay ? `Marked ${candidateProfile.operations.promisedToPayAt ? new Date(candidateProfile.operations.promisedToPayAt).toLocaleString() : 'recently'}` : 'Not marked yet'}</p><button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ isPromisedToPay: !candidateProfile.operations.isPromisedToPay })} className={`mt-2 w-full inline-flex justify-center items-center gap-1 rounded-lg text-white text-xs font-bold py-2 ${candidateProfile.operations.isPromisedToPay ? 'bg-slate-700 hover:bg-slate-800' : 'bg-amber-600 hover:bg-amber-700'}`}>{candidateProfile.operations.isPromisedToPay ? <><RotateCcw className="h-3.5 w-3.5" />Remove promise to pay</> : <><HandCoins className="h-3.5 w-3.5" />Mark as promise to pay</>}</button></div><div className="border-t border-slate-100 mt-3 pt-3"><label className="text-[10px] uppercase font-bold text-slate-500">Block reason</label><input value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Optional reason" className="w-full mt-1 mb-2 px-3 py-2 rounded-lg border border-slate-200 text-xs" />{candidateProfile.operations.isBlocked ? <button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ isBlocked: false })} className="w-full inline-flex justify-center items-center gap-1 rounded-lg bg-slate-700 text-white text-xs font-bold py-2"><RotateCcw className="h-3.5 w-3.5" />Restore candidate</button> : <button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ isBlocked: true, blockedReason: blockReason })} className="w-full inline-flex justify-center items-center gap-1 rounded-lg bg-rose-600 text-white text-xs font-bold py-2"><Ban className="h-3.5 w-3.5" />Block candidate</button>}</div></div>
                     <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3 flex items-center gap-1"><StickyNote className="h-4 w-4 text-indigo-600" />Call notes</h3><textarea value={candidateNote} onChange={(e) => setCandidateNote(e.target.value)} placeholder="Record the outcome, commitment, or next step..." rows={3} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs resize-y" /><button disabled={!candidateNote.trim() || savingCandidateOperation} onClick={() => void addCandidateNote()} className="mt-2 w-full rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold py-2">Save note</button><div className="mt-3 space-y-2 max-h-40 overflow-y-auto">{candidateProfile.operations.notes.map((note) => <div key={note.id} className="rounded-lg bg-slate-50 border border-slate-200 p-2 text-xs"><p className="text-slate-700 whitespace-pre-wrap">{note.text}</p><p className="text-[10px] text-slate-400 mt-1">{new Date(note.createdAt).toLocaleString()}</p></div>)}</div></div>
                   </div>
                 </div>
