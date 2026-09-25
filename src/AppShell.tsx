@@ -25,6 +25,7 @@ import { EmailLogsPage } from './pages/EmailLogsPage';
 import { DocumentVaultPage } from './pages/DocumentVaultPage';
 import { TeamRbacPage } from './pages/TeamRbacPage';
 import { CandidatesDirectoryPage } from './pages/CandidatesDirectoryPage';
+import { GtpRecruitersPage } from './pages/GtpRecruitersPage';
 import { ImportDetailPage } from './pages/ImportDetailPage';
 import { fetchJobById } from './api/jobsApi';
 import { ActivateAccount } from './auth/ActivateAccount';
@@ -394,6 +395,8 @@ export const AppShell: React.FC = () => {
           {activeTab === 'document_vault' && isAuthenticated && <DocumentVaultPage />}
 
           {activeTab === 'team_rbac' && isAuthenticated && <TeamRbacPage />}
+
+          {activeTab === 'gtp_recruiters' && isAuthenticated && <GtpRecruitersPage />}
 
           {activeTab === 'candidates_directory' && isAuthenticated && <CandidatesDirectoryPage />}
         </main>

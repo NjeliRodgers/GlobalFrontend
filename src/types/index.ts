@@ -11,6 +11,8 @@ export interface User {
   gender?: string;
   location?: string;
   age?: number;
+  isSupportAgent?: boolean;
+  assignedRecruiterId?: string | null;
   createdAt: string;
 }
 

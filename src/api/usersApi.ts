@@ -145,6 +145,8 @@ export interface CandidateDirectoryRow {
   actionTags?: string[];
   daysSinceRegistration?: number;
   daysSinceLastActivity?: number | null;
+  assignedRecruiterId?: string | null;
+  assignedRecruiterName?: string | null;
   isBlocked?: boolean;
   blockedAt?: string | null;
   blockedReason?: string | null;
@@ -229,6 +231,17 @@ export interface CandidatesDirectoryFilters {
   sortOrder?: 'asc' | 'desc';
   limit?: number;
   includeBlocked?: boolean;
+  assignedRecruiterId?: string;
+}
+
+export interface RecruiterSupportAgentRow {
+  id: string;
+  name: string;
+  email: string;
+  isActive: boolean;
+  isSupportAgent: boolean;
+  assignedCandidates: number;
+  createdAt: string;
 }
 
 export interface CandidatesDirectoryResponse {
@@ -303,6 +316,7 @@ export async function fetchCandidatesDirectoryReport(filters?: CandidatesDirecto
     if (filters?.sortOrder) params.set('sortOrder', filters.sortOrder);
     if (typeof filters?.limit === 'number') params.set('limit', String(filters.limit));
     if (typeof filters?.includeBlocked === 'boolean') params.set('includeBlocked', String(filters.includeBlocked));
+    if (filters?.assignedRecruiterId) params.set('assignedRecruiterId', filters.assignedRecruiterId);
 
     const query = params.toString();
     const res = await apiFetch(`/users/candidates/directory${query ? `?${query}` : ''}`);
@@ -320,6 +334,40 @@ export async function fetchCandidatesDirectoryReport(filters?: CandidatesDirecto
 export async function fetchCandidatesDirectory(filters?: CandidatesDirectoryFilters): Promise<CandidateDirectoryRow[]> {
   const data = await fetchCandidatesDirectoryReport(filters);
   return data.candidates;
+}
+
+export async function fetchRecruiterSupportAgents(): Promise<RecruiterSupportAgentRow[]> {
+  const res = await apiFetch('/users/recruiters/support-agents');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to load recruiters.');
+  return data.recruiters || [];
+}
+
+export async function setRecruiterSupportAgent(recruiterId: string, isSupportAgent: boolean): Promise<{
+  recruiter: RecruiterSupportAgentRow | null;
+  reassignmentSummary: { reassigned: number; unassigned: number };
+}> {
+  const res = await apiFetch(`/users/recruiters/${recruiterId}/support-agent`, {
+    method: 'PATCH',
+    headers: jsonHeaders,
+    body: JSON.stringify({ isSupportAgent })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to update recruiter support status.');
+  return {
+    recruiter: data.recruiter || null,
+    reassignmentSummary: data.reassignmentSummary || { reassigned: 0, unassigned: 0 }
+  };
+}
+
+export async function rebalanceCandidateAssignments(): Promise<{ assigned: number; unassigned: number }> {
+  const res = await apiFetch('/users/candidates/rebalance-assignments', {
+    method: 'POST',
+    headers: jsonHeaders
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to rebalance candidate assignments.');
+  return data.summary || { assigned: 0, unassigned: 0 };
 }
 export async function updateUserProfile(userId: string, updates: {
   name?: string;

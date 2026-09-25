@@ -3,7 +3,10 @@ import {
   fetchCandidatesDirectoryReport,
   CandidateDirectoryRow,
   CandidatesDirectoryAnalytics,
-  CandidatesDirectoryFilters
+  CandidatesDirectoryFilters,
+  fetchRecruiterSupportAgents,
+  RecruiterSupportAgentRow,
+  rebalanceCandidateAssignments
 } from '../api/usersApi';
 import {
   createCandidateApplicationAndSendAccessCode,
@@ -148,6 +151,9 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
   const [platformActive, setPlatformActive] = useState<'any' | 'yes' | 'no'>('any');
   const [followUpFilter, setFollowUpFilter] = useState<'any' | 'overdue' | 'today' | 'upcoming_7' | 'scheduled' | 'none'>('any');
   const [includeBlocked, setIncludeBlocked] = useState(false);
+  const [assignedRecruiterFilter, setAssignedRecruiterFilter] = useState('all');
+  const [supportAgents, setSupportAgents] = useState<RecruiterSupportAgentRow[]>([]);
+  const [rebalancingAssignments, setRebalancingAssignments] = useState(false);
   const [minApplications, setMinApplications] = useState('');
   const [maxApplications, setMaxApplications] = useState('');
   const [minTotalPaidKsh, setMinTotalPaidKsh] = useState('');
@@ -182,7 +188,8 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     sortBy,
     sortOrder,
     search: search || undefined,
-    includeBlocked
+    includeBlocked,
+    assignedRecruiterId: assignedRecruiterFilter === 'all' ? undefined : assignedRecruiterFilter
   });
 
   const loadData = async (filters?: CandidatesDirectoryFilters, options?: { silent?: boolean }) => {
@@ -216,6 +223,18 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     void loadData();
   }, [initialJobId]);
 
+  useEffect(() => {
+    const loadSupportAgents = async () => {
+      try {
+        const rows = await fetchRecruiterSupportAgents();
+        setSupportAgents(rows.filter((row) => row.isSupportAgent));
+      } catch {
+        setSupportAgents([]);
+      }
+    };
+    void loadSupportAgents();
+  }, []);
+
   const applyFilters = async () => {
     await loadData(buildCurrentFilters(), { silent: true });
     showToast('info', 'Filters applied.');
@@ -237,9 +256,27 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     setSortOrder('desc');
     setSearch('');
     setIncludeBlocked(false);
+    setAssignedRecruiterFilter('all');
     setSelectedActionId('all');
     await loadData({ includeBlocked: false }, { silent: true });
     showToast('info', 'Filters reset.');
+  };
+
+  const handleRebalanceAssignments = async () => {
+    setRebalancingAssignments(true);
+    try {
+      const summary = await rebalanceCandidateAssignments();
+      showToast('success', `Assignments randomized. Assigned ${summary.assigned}, unassigned ${summary.unassigned}.`);
+      const [recruiters] = await Promise.all([
+        fetchRecruiterSupportAgents(),
+        loadData(buildCurrentFilters(), { silent: true })
+      ]);
+      setSupportAgents(recruiters.filter((row) => row.isSupportAgent));
+    } catch (error: any) {
+      showToast('error', error?.message || 'Unable to randomize candidate assignments.');
+    } finally {
+      setRebalancingAssignments(false);
+    }
   };
 
   const formatCurrency = (value: number) =>
@@ -621,6 +658,14 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
               <UserPlus className="h-3.5 w-3.5" /> Apply On Behalf
             </button>
             <button
+              onClick={() => void handleRebalanceAssignments()}
+              disabled={rebalancingAssignments}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold bg-amber-600 hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${rebalancingAssignments ? 'animate-spin' : ''}`} />
+              {rebalancingAssignments ? 'Randomizing...' : 'Randomize Candidate Assignments'}
+            </button>
+            <button
               onClick={clearAllFilters}
               className="inline-flex items-center gap-1 px-3 py-1.5 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg"
             >
@@ -731,6 +776,20 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
           >
             <option value="active">Candidate view: Active only</option>
             <option value="bin">Candidate view: Blocked bin</option>
+          </select>
+
+          <select
+            value={assignedRecruiterFilter}
+            onChange={(e) => setAssignedRecruiterFilter(e.target.value)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="all">Support Agent: All</option>
+            <option value="unassigned">Support Agent: Unassigned candidates</option>
+            {supportAgents.map((agent) => (
+              <option key={agent.id} value={agent.id}>
+                Support Agent: {agent.name}
+              </option>
+            ))}
           </select>
 
           <input
@@ -1036,6 +1095,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[10px]">
                   <th className="p-3">Candidate</th>
+                  <th className="p-3">Support Agent</th>
                   <th className="p-3">Platform Account</th>
                   <th className="p-3">Atesta</th>
                   <th className="p-3">Sales Stage</th>
@@ -1055,6 +1115,17 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                           <div className="text-[10px] text-slate-500">{row.email}</div>
                           <div className="text-[10px] text-slate-400">{row.phone || 'No phone'} • {row.location || 'No location'}{row.age ? ` • Age ${row.age}` : ''}</div>
                           {row.isPromisedToPay && <span className="inline-flex mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Promise to Pay</span>}
+                        </td>
+                        <td className="p-3">
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                              row.assignedRecruiterName
+                                ? 'bg-cyan-50 text-cyan-700 border-cyan-200'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}
+                          >
+                            {row.assignedRecruiterName || 'Unassigned'}
+                          </span>
                         </td>
                         <td className="p-3">
                           <span
@@ -1200,7 +1271,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                   </div>
 
                   <div className="space-y-4">
-                    <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3">Candidate Contact and Profile</h3><div className="space-y-2 text-xs"><p className="text-slate-700"><span className="font-semibold text-slate-900">Full Name:</span> {candidateProfile.candidate.name}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Email:</span> {candidateProfile.candidate.email}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Phone:</span> {candidateProfile.candidate.phone || 'Not provided'}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Location:</span> {candidateProfile.candidate.location || 'Not provided'}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Platform account:</span> {candidateProfile.candidate.hasPlatformAccount ? (candidateProfile.candidate.platformAccountActive ? 'Active' : 'Inactive') : 'Not registered'}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Joined:</span> {candidateProfile.candidate.platformJoinedAt ? new Date(candidateProfile.candidate.platformJoinedAt).toLocaleDateString() : 'N/A'}</p></div></div>
+                    <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3">Candidate Contact and Profile</h3><div className="space-y-2 text-xs"><p className="text-slate-700"><span className="font-semibold text-slate-900">Full Name:</span> {candidateProfile.candidate.name}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Email:</span> {candidateProfile.candidate.email}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Phone:</span> {candidateProfile.candidate.phone || 'Not provided'}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Location:</span> {candidateProfile.candidate.location || 'Not provided'}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Support agent:</span> {selectedCandidate.assignedRecruiterName || 'Unassigned'}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Platform account:</span> {candidateProfile.candidate.hasPlatformAccount ? (candidateProfile.candidate.platformAccountActive ? 'Active' : 'Inactive') : 'Not registered'}</p><p className="text-slate-700"><span className="font-semibold text-slate-900">Joined:</span> {candidateProfile.candidate.platformJoinedAt ? new Date(candidateProfile.candidate.platformJoinedAt).toLocaleDateString() : 'N/A'}</p></div></div>
                     <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3 flex items-center gap-1"><CalendarDays className="h-4 w-4 text-amber-600" />Follow-up and status</h3><label className="text-[10px] uppercase font-bold text-slate-500">Next follow-up date</label><input type="date" value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} className="w-full mt-1 mb-2 px-3 py-2 rounded-lg border border-slate-200 text-xs" /><button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ nextFollowUpAt: followUpDate ? new Date(`${followUpDate}T09:00:00`).toISOString() : null })} className="w-full rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2">Save follow-up</button><div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5"><p className="text-[10px] uppercase font-bold text-amber-700">Promise to pay</p><p className="text-[11px] text-amber-800 mt-0.5">{candidateProfile.operations.isPromisedToPay ? `Marked ${candidateProfile.operations.promisedToPayAt ? new Date(candidateProfile.operations.promisedToPayAt).toLocaleString() : 'recently'}` : 'Not marked yet'}</p><button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ isPromisedToPay: !candidateProfile.operations.isPromisedToPay })} className={`mt-2 w-full inline-flex justify-center items-center gap-1 rounded-lg text-white text-xs font-bold py-2 ${candidateProfile.operations.isPromisedToPay ? 'bg-slate-700 hover:bg-slate-800' : 'bg-amber-600 hover:bg-amber-700'}`}>{candidateProfile.operations.isPromisedToPay ? <><RotateCcw className="h-3.5 w-3.5" />Remove promise to pay</> : <><HandCoins className="h-3.5 w-3.5" />Mark as promise to pay</>}</button></div><div className="border-t border-slate-100 mt-3 pt-3"><label className="text-[10px] uppercase font-bold text-slate-500">Block reason</label><input value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Optional reason" className="w-full mt-1 mb-2 px-3 py-2 rounded-lg border border-slate-200 text-xs" />{candidateProfile.operations.isBlocked ? <button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ isBlocked: false })} className="w-full inline-flex justify-center items-center gap-1 rounded-lg bg-slate-700 text-white text-xs font-bold py-2"><RotateCcw className="h-3.5 w-3.5" />Restore candidate</button> : <button disabled={savingCandidateOperation} onClick={() => void saveCandidateOperation({ isBlocked: true, blockedReason: blockReason })} className="w-full inline-flex justify-center items-center gap-1 rounded-lg bg-rose-600 text-white text-xs font-bold py-2"><Ban className="h-3.5 w-3.5" />Block candidate</button>}</div></div>
                     <div className="bg-white rounded-xl border border-slate-200 p-4"><h3 className="font-black text-sm text-slate-900 mb-3 flex items-center gap-1"><StickyNote className="h-4 w-4 text-indigo-600" />Call notes</h3><textarea value={candidateNote} onChange={(e) => setCandidateNote(e.target.value)} placeholder="Record the outcome, commitment, or next step..." rows={3} className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs resize-y" /><button disabled={!candidateNote.trim() || savingCandidateOperation} onClick={() => void addCandidateNote()} className="mt-2 w-full rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold py-2">Save note</button><div className="mt-3 space-y-2 max-h-40 overflow-y-auto">{candidateProfile.operations.notes.map((note) => <div key={note.id} className="rounded-lg bg-slate-50 border border-slate-200 p-2 text-xs"><p className="text-slate-700 whitespace-pre-wrap">{note.text}</p><p className="text-[10px] text-slate-400 mt-1">{new Date(note.createdAt).toLocaleString()}</p></div>)}</div></div>
                   </div>
