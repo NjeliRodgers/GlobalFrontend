@@ -6,7 +6,8 @@ import {
   CandidatesDirectoryFilters,
   fetchRecruiterSupportAgents,
   RecruiterSupportAgentRow,
-  rebalanceCandidateAssignments
+  rebalanceCandidateAssignments,
+  claimCandidateAssignment
 } from '../api/usersApi';
 import {
   createCandidateApplicationAndSendAccessCode,
@@ -41,6 +42,7 @@ import {
   UserPlus
 } from 'lucide-react';
 import { fetchCandidateSupportProfile, SupportProfile, updateCandidateOperations, CandidateOperationsUpdate } from '../api/supportApi';
+import { useAuth } from '../auth/AuthContext';
 
 interface CandidatesDirectoryPageProps {
   initialJobId?: string;
@@ -107,6 +109,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
   initialJobId,
   initialJobTitle
 }) => {
+  const { role } = useAuth();
   const [rows, setRows] = useState<CandidateDirectoryRow[]>([]);
   const [periodAnalytics, setPeriodAnalytics] = useState<CandidatesDirectoryAnalytics>(EMPTY_ANALYTICS);
   const [loading, setLoading] = useState(true);
@@ -154,6 +157,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
   const [assignedRecruiterFilter, setAssignedRecruiterFilter] = useState('all');
   const [supportAgents, setSupportAgents] = useState<RecruiterSupportAgentRow[]>([]);
   const [rebalancingAssignments, setRebalancingAssignments] = useState(false);
+  const [claimingCandidate, setClaimingCandidate] = useState(false);
   const [minApplications, setMinApplications] = useState('');
   const [maxApplications, setMaxApplications] = useState('');
   const [minTotalPaidKsh, setMinTotalPaidKsh] = useState('');
@@ -276,6 +280,35 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
       showToast('error', error?.message || 'Unable to randomize candidate assignments.');
     } finally {
       setRebalancingAssignments(false);
+    }
+  };
+
+  const handleClaimCandidate = async () => {
+    if (!selectedCandidate) return;
+    setClaimingCandidate(true);
+    try {
+      const result = await claimCandidateAssignment(selectedCandidate.email);
+      const assignedRecruiterId = result.assignment.assignedRecruiterId;
+      const assignedRecruiterName = result.assignment.assignedRecruiterName;
+
+      setRows((prev) => prev.map((row) => (
+        row.email.toLowerCase() === selectedCandidate.email.toLowerCase()
+          ? { ...row, assignedRecruiterId, assignedRecruiterName }
+          : row
+      )));
+
+      setSelectedCandidate((prev) => (
+        prev && prev.email.toLowerCase() === selectedCandidate.email.toLowerCase()
+          ? { ...prev, assignedRecruiterId, assignedRecruiterName }
+          : prev
+      ));
+
+      showToast('success', `Candidate assigned to ${assignedRecruiterName}.`);
+      void loadData(buildCurrentFilters(), { silent: true });
+    } catch (error: any) {
+      showToast('error', error?.message || 'Unable to claim candidate.');
+    } finally {
+      setClaimingCandidate(false);
     }
   };
 
@@ -1194,7 +1227,21 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                   </div>
                 </div>
               </div>
-              <button type="button" onClick={closeCandidate} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100" title="Close candidate details"><X className="h-5 w-5" /></button>
+              <div className="flex items-center gap-2">
+                {role === 'recruiter' && (
+                  <button
+                    type="button"
+                    onClick={() => void handleClaimCandidate()}
+                    disabled={claimingCandidate}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg font-bold text-[11px]"
+                    title="Assign this candidate to yourself"
+                  >
+                    {claimingCandidate ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Users className="h-3.5 w-3.5" />}
+                    {claimingCandidate ? 'Assigning...' : 'Take Candidate'}
+                  </button>
+                )}
+                <button type="button" onClick={closeCandidate} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100" title="Close candidate details"><X className="h-5 w-5" /></button>
+              </div>
             </div>
 
             {candidateProfileLoading ? (

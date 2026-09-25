@@ -369,6 +369,26 @@ export async function rebalanceCandidateAssignments(): Promise<{ assigned: numbe
   if (!res.ok) throw new Error(data.error || 'Failed to rebalance candidate assignments.');
   return data.summary || { assigned: 0, unassigned: 0 };
 }
+
+export async function claimCandidateAssignment(candidateEmail: string): Promise<{
+  assignment: {
+    candidateId: string;
+    candidateEmail: string;
+    assignedRecruiterId: string;
+    assignedRecruiterName: string;
+  };
+}> {
+  const res = await apiFetch('/users/candidates/claim-assignment', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify({ candidateEmail })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to claim candidate assignment.');
+  return {
+    assignment: data.assignment
+  };
+}
 export async function updateUserProfile(userId: string, updates: {
   name?: string;
   phone?: string;
