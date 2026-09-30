@@ -93,8 +93,6 @@ export async function createCandidateApplicationAndSendAccessCode(payload: {
   jobId: string;
 }): Promise<{
   delivered: boolean;
-  voucher: { code: string; redeemedAt: string | null; issuedAt: string | null };
-  packageRefs: string[];
   candidateCreated: boolean;
   applicationCreated: boolean;
   application: { id: string; jobId: string; jobTitle: string; candidateEmail: string };
@@ -110,8 +108,6 @@ export async function createCandidateApplicationAndSendAccessCode(payload: {
 
   return {
     delivered: !!data.delivered,
-    voucher: data.voucher,
-    packageRefs: data.packageRefs || [],
     candidateCreated: !!data.candidateCreated,
     applicationCreated: !!data.applicationCreated,
     application: data.application

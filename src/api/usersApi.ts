@@ -154,6 +154,7 @@ export interface CandidateDirectoryRow {
   promisedToPayAt?: string | null;
   nextFollowUpAt?: string | null;
   notesCount?: number;
+  lastNoteAt?: string | null;
 }
 
 export interface CandidatesDirectoryAnalytics {

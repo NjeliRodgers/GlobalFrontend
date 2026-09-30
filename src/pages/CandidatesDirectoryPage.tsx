@@ -41,7 +41,13 @@ import {
   GraduationCap,
   UserPlus
 } from 'lucide-react';
-import { fetchCandidateSupportProfile, SupportProfile, updateCandidateOperations, CandidateOperationsUpdate } from '../api/supportApi';
+import {
+  fetchCandidateSupportProfile,
+  SupportProfile,
+  updateCandidateOperations,
+  CandidateOperationsUpdate,
+  assumeSupportItemPaid
+} from '../api/supportApi';
 import { useAuth } from '../auth/AuthContext';
 
 interface CandidatesDirectoryPageProps {
@@ -130,6 +136,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
   const [codeEmailStatusByAppId, setCodeEmailStatusByAppId] = useState<Record<string, { ok: boolean; message: string }>>({});
   const [sendingManualEmail, setSendingManualEmail] = useState<string | null>(null);
   const [manualEmailStatusByAppId, setManualEmailStatusByAppId] = useState<Record<string, { ok: boolean; message: string }>>({});
+  const [markingPaidItemKey, setMarkingPaidItemKey] = useState<string | null>(null);
   const [toasts, setToasts] = useState<UiToast[]>([]);
 
   const [showApplyOnBehalfModal, setShowApplyOnBehalfModal] = useState(false);
@@ -367,6 +374,33 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     };
   };
 
+  const getNoteMeta = (lastNoteAt?: string | null) => {
+    if (!lastNoteAt) {
+      return {
+        label: 'No notes',
+        tone: 'bg-slate-100 text-slate-600 border-slate-200'
+      };
+    }
+
+    const noteDate = new Date(lastNoteAt);
+    if (Number.isNaN(noteDate.getTime())) {
+      return {
+        label: 'Invalid date',
+        tone: 'bg-rose-50 text-rose-700 border-rose-200'
+      };
+    }
+
+    const now = Date.now();
+    const diffDays = Math.floor((now - noteDate.getTime()) / (24 * 60 * 60 * 1000));
+
+    return {
+      label: `${Math.max(0, diffDays)}d ago`,
+      tone: diffDays >= 2
+        ? 'bg-amber-50 text-amber-700 border-amber-200'
+        : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+    };
+  };
+
   const copyCode = async (code: string) => {
     await navigator.clipboard.writeText(code);
     setCopiedCode(code);
@@ -436,6 +470,82 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     }
   };
 
+  const handleAssumePaidItem = async (
+    applicationId: string,
+    packageRef: string,
+    itemType: 'course' | 'exam',
+    itemId: string
+  ) => {
+    if (!candidateProfile) return;
+    const actionKey = `${applicationId}:${packageRef}:${itemType}:${itemId}`;
+    setMarkingPaidItemKey(actionKey);
+
+    try {
+      const result = await assumeSupportItemPaid({
+        applicationId,
+        packageRef,
+        itemType,
+        itemId
+      });
+
+      setCandidateProfile((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          applications: current.applications.map((app) => {
+            if (app.id !== applicationId) return app;
+            return {
+              ...app,
+              assignedPackages: app.assignedPackages.map((pkg) => {
+                const matchesPackage =
+                  String(pkg.packageId || '').toLowerCase() === String(packageRef || '').toLowerCase() ||
+                  String(pkg.id || '').toLowerCase() === String(packageRef || '').toLowerCase();
+                if (!matchesPackage) return pkg;
+
+                if (itemType === 'course') {
+                  return {
+                    ...pkg,
+                    courses: pkg.courses.map((item) => (
+                      item.id === itemId
+                        ? {
+                            ...item,
+                            isPaid: true,
+                            enrollmentStatus: 'in_progress',
+                            paymentRef: result.transactionRef || item.paymentRef || null
+                          }
+                        : item
+                    ))
+                  };
+                }
+
+                return {
+                  ...pkg,
+                  exams: pkg.exams.map((item) => (
+                    item.id === itemId
+                      ? {
+                          ...item,
+                          isPaid: true,
+                          enrollmentStatus: 'in_progress',
+                          paymentRef: result.transactionRef || item.paymentRef || null
+                        }
+                      : item
+                  ))
+                };
+              })
+            };
+          })
+        };
+      });
+
+      showToast('success', result.message || 'Payment status updated.');
+      void loadData(buildCurrentFilters(), { silent: true });
+    } catch (error: any) {
+      showToast('error', error?.message || 'Failed to mark item as paid.');
+    } finally {
+      setMarkingPaidItemKey(null);
+    }
+  };
+
   const openCandidate = async (row: CandidateDirectoryRow) => {
     setSelectedCandidate(row);
     setCandidateProfile(null);
@@ -468,6 +578,13 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     setSavingCandidateOperation(true);
     try {
       const operations = await updateCandidateOperations({ candidateEmail: selectedCandidate.email, ...payload });
+      const latestNoteAt = Array.isArray(operations.notes)
+        ? operations.notes.reduce((latest: string | null, note) => {
+            if (!note?.createdAt) return latest;
+            if (!latest) return note.createdAt;
+            return new Date(note.createdAt).getTime() > new Date(latest).getTime() ? note.createdAt : latest;
+          }, null)
+        : null;
       setCandidateProfile((current) => current ? { ...current, operations } : current);
       setRows((prev) => prev
         .map((row) => {
@@ -485,7 +602,8 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
             isPromisedToPay: operations.isPromisedToPay,
             promisedToPayAt: operations.promisedToPayAt,
             actionTags: updatedTags,
-            notesCount: operations.notes.length
+            notesCount: operations.notes.length,
+            lastNoteAt: latestNoteAt
           };
         })
         .filter((row) => {
@@ -576,8 +694,8 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
     try {
       const result = await createCandidateApplicationAndSendAccessCode(payload);
       const summary = result.delivered
-        ? `Application captured for ${payload.candidateEmail}. Access-code email sent. ${result.applicationCreated ? 'New application created.' : 'Existing application reused.'}`
-        : `Application captured for ${payload.candidateEmail}, but email delivery could not be confirmed.`;
+        ? `Manual application accepted for ${payload.candidateEmail}. Confirmation email sent with onboarding attachment. ${result.applicationCreated ? 'New application created.' : 'Existing application reused.'}`
+        : `Manual application accepted for ${payload.candidateEmail}, but email delivery could not be confirmed.`;
 
       showToast(result.delivered ? 'success' : 'info', summary);
       setShowApplyOnBehalfModal(false);
@@ -1132,6 +1250,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                   <th className="p-3">Platform Account</th>
                   <th className="p-3">Atesta</th>
                   <th className="p-3">Sales Stage</th>
+                  <th className="p-3">Notes</th>
                   <th className="p-3">Next Follow-up</th>
                   <th className="p-3">Applications</th>
                   <th className="p-3">Paid</th>
@@ -1179,6 +1298,16 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                           </span>
                         </td>
                         <td className="p-3 text-slate-700">{SALES_STAGE_LABELS[row.salesStage || ''] || row.salesStage || 'Unknown'}</td>
+                        <td className="p-3">
+                          {(() => {
+                            const noteMeta = getNoteMeta(row.lastNoteAt || null);
+                            return (
+                              <span className={`inline-flex px-2 py-0.5 rounded-full border text-[10px] font-bold ${noteMeta.tone}`}>
+                                {noteMeta.label}
+                              </span>
+                            );
+                          })()}
+                        </td>
                         <td className="p-3">
                           {(() => {
                             const followUpMeta = getFollowUpMeta(row.nextFollowUpAt || null);
@@ -1310,7 +1439,45 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
                           </div>
                           <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-indigo-600" style={{ width: `${app.readinessProgress.percentage}%` }} /></div>
                           <div className="grid grid-cols-2 gap-2 text-xs">{app.readinessProgress.items.map((item) => <div key={item.id} className={`rounded-lg border p-2 ${item.complete ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>{item.complete ? 'Complete' : 'Pending'} · {item.message}</div>)}</div>
-                          {app.assignedPackages.map((pkg) => <div key={pkg.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3"><p className="font-bold text-xs text-slate-900 flex items-center gap-1"><BookOpen className="h-3.5 w-3.5 text-indigo-600" />{pkg.name}</p><div className="mt-2 space-y-1">{[...pkg.courses.map((item) => ({ ...item, type: 'Course' })), ...pkg.exams.map((item) => ({ ...item, type: 'Exam' }))].map((item) => <div key={`${item.type}-${item.id}`} className="flex items-center justify-between gap-2 text-[11px]"><span className="flex items-center gap-1"><GraduationCap className="h-3 w-3 text-slate-400" />{item.type}: {item.name}</span><span className={`font-bold ${item.isPaid ? 'text-emerald-700' : 'text-amber-700'}`}>{item.isPaid ? 'Paid / unlocked' : item.enrollmentStatus || 'Not paid'}</span></div>)}</div></div>)}
+                          {app.assignedPackages.map((pkg) => (
+                            <div key={pkg.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                              <p className="font-bold text-xs text-slate-900 flex items-center gap-1">
+                                <BookOpen className="h-3.5 w-3.5 text-indigo-600" />
+                                {pkg.name}
+                              </p>
+                              <div className="mt-2 space-y-1">
+                                {[...pkg.courses.map((item) => ({ ...item, type: 'Course' })), ...pkg.exams.map((item) => ({ ...item, type: 'Exam' }))].map((item) => {
+                                  const itemType = item.type === 'Course' ? 'course' : 'exam';
+                                  const itemActionKey = `${app.id}:${pkg.packageId}:${itemType}:${item.id}`;
+                                  const isMarkingThisItem = markingPaidItemKey === itemActionKey;
+
+                                  return (
+                                    <div key={`${item.type}-${item.id}`} className="flex items-center justify-between gap-2 text-[11px]">
+                                      <span className="flex items-center gap-1">
+                                        <GraduationCap className="h-3 w-3 text-slate-400" />
+                                        {item.type}: {item.name}
+                                      </span>
+                                      <div className="flex items-center gap-2">
+                                        <span className={`font-bold ${item.isPaid ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                          {item.isPaid ? 'Paid / unlocked' : item.enrollmentStatus || 'Not paid'}
+                                        </span>
+                                        {!item.isPaid && (
+                                          <button
+                                            type="button"
+                                            onClick={() => void handleAssumePaidItem(app.id, pkg.packageId || pkg.id, itemType, item.id)}
+                                            disabled={isMarkingThisItem}
+                                            className="inline-flex items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                                          >
+                                            {isMarkingThisItem ? 'Marking...' : `Mark ${item.type} Paid`}
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ))}
                     </div>
@@ -1335,7 +1502,7 @@ export const CandidatesDirectoryPage: React.FC<CandidatesDirectoryPageProps> = (
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               <div>
                 <h3 className="text-base font-extrabold text-slate-900">Apply On Behalf</h3>
-                <p className="text-xs text-slate-500">Create a candidate application and send Atesta access code in one step.</p>
+                <p className="text-xs text-slate-500">Create a manual application, add the candidate to the system, and send a confirmation email with attachment.</p>
               </div>
               <button type="button" onClick={closeApplyOnBehalfModal} className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100" title="Close"><X className="h-4 w-4" /></button>
             </div>
