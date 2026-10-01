@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Job, SubmittedDocument } from '../types';
 import { useAuth } from '../auth/AuthContext';
-import { submitApplication, fetchApplications, uploadApplicationDocument } from '../api/applicationsApi';
+import { submitApplication, fetchApplications } from '../api/applicationsApi';
 import { validateAtestaCertificate, AtestaValidationResult } from '../api/apexAssessmentApi';
 import { isValidEmail, isValidPhone, EMAIL_ERROR_MESSAGE, PHONE_ERROR_MESSAGE } from '../utils/validators';
 import {
@@ -182,8 +182,6 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
     if (!candidateEmail.trim()) missing.push('Email Address');
     if (!candidatePhone.trim()) missing.push('Phone Number');
     if (!candidateLocation.trim()) missing.push('Current Location');
-    if (!resumeFile) missing.push('Resume / CV');
-    if (!idFile) missing.push('National ID / Passport');
 
     if (missing.length > 0) {
       setError(`Please complete all required fields before continuing: ${missing.join(', ')}.`);
@@ -207,7 +205,6 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
   const complianceIncomplete = COMPLIANCE_QUESTIONS.some((q) => {
     const answer = complianceAnswers[q.id];
     if (answer === null) return true;
-    if (answer === 'yes' && q.needsUploadOnYes && !q.optionalUploadOnYes && !complianceFiles[q.id]) return true;
     return false;
   });
 
@@ -224,7 +221,7 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
     e.preventDefault();
 
     if (complianceIncomplete) {
-      setError('Please answer every question and attach any required document before applying.');
+      setError('Please answer every question before applying.');
       return;
     }
 
@@ -275,39 +272,6 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
     }
 
     try {
-      if (!resumeFile || !idFile) {
-        throw new Error('Resume/CV and National ID/Passport are required.');
-      }
-
-      const uploads: Array<{ file: File; fileType: SubmittedDocument['fileType'] }> = [
-        { file: resumeFile, fileType: 'resume' },
-        { file: idFile, fileType: 'id_card' }
-      ];
-
-      if (coverLetterFile) uploads.push({ file: coverLetterFile, fileType: 'cover_letter' });
-      if (certificateFile) uploads.push({ file: certificateFile, fileType: 'certificate' });
-
-      for (const q of COMPLIANCE_QUESTIONS) {
-        const file = complianceFiles[q.id];
-        if (file && q.uploadFileType) {
-          uploads.push({ file, fileType: q.uploadFileType });
-        }
-      }
-
-      // Upload in parallel so candidates with multiple attachments are not
-      // blocked by one-by-one network round trips.
-      const uploadedDocuments = await Promise.all(
-        uploads.map(async (item) => {
-          try {
-            return await uploadApplicationDocument(item.file, item.fileType);
-          } catch (uploadError: any) {
-            throw new Error(
-              `Could not upload your ${item.fileType.replace('_', ' ')} document. ${uploadError?.message || 'Please try again.'}`
-            );
-          }
-        })
-      );
-
       const { application } = await submitApplication({
         jobId: job.id,
         jobTitle: job.title,
@@ -320,7 +284,7 @@ export const ApplyPage: React.FC<ApplyPageProps> = ({ job, onBack, onSubmitted }
         currentCompany,
         linkedinUrl: isTechRole ? linkedinUrl : undefined,
         portfolioUrl: isTechRole ? portfolioUrl : undefined,
-        documents: uploadedDocuments,
+        documents: [],
         complianceAnswers,
         atestaCertificateId: atestaCheckStatus === 'valid' ? atestaCertificateId.trim() : null
       });
