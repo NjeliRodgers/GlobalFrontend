@@ -1,4 +1,4 @@
-import { ApexQuestion, ApexExam, ApexInterviewProduct, ApexCourse, ApexCourseModule, ApexModuleQuizQuestion, ApexPackage, PaystackPayment, AiInterviewSession, ApexCertificate } from '../types';
+import { ApexQuestion, ApexExam, ApexInterviewProduct, ApexCourse, ApexCourseModule, ApexModuleQuizQuestion, ApexPackage, PaystackPayment, AiInterviewSession, ApexCertificate, ApexInstitution } from '../types';
 import { apiFetch, jsonHeaders } from './client';
 
 // Exams
@@ -131,6 +131,44 @@ export const deleteApexPackage = async (id: string): Promise<boolean> => {
   const res = await apiFetch(`/apex/packages/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete package');
   return true;
+};
+
+// Institutions
+export const getApexInstitutions = async (): Promise<ApexInstitution[]> => {
+  const res = await apiFetch('/apex/institutions');
+  if (!res.ok) throw new Error('Failed to load institutions');
+  return res.json();
+};
+
+export const saveApexInstitution = async (institution: ApexInstitution): Promise<ApexInstitution> => {
+  const res = await apiFetch('/apex/institutions', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(institution)
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to save institution');
+  return data.institution;
+};
+
+export const deleteApexInstitution = async (id: string): Promise<boolean> => {
+  const res = await apiFetch(`/apex/institutions/${id}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to delete institution');
+  return true;
+};
+
+export const uploadApexInstitutionLogo = async (id: string, file: File): Promise<ApexInstitution> => {
+  const formData = new FormData();
+  formData.append('logo', file);
+
+  const res = await apiFetch(`/apex/institutions/${id}/logo`, {
+    method: 'POST',
+    body: formData
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to upload institution logo');
+  return data.institution;
 };
 
 // Interview Products

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ApexQuestion, ApexExam, ApexInterviewProduct, ApexCourse, ApexCourseModule, ApexPackage, PaystackPayment, AiInterviewSession, ApexCertificate } from '../types';
+import { ApexQuestion, ApexExam, ApexInterviewProduct, ApexCourse, ApexCourseModule, ApexPackage, PaystackPayment, AiInterviewSession, ApexCertificate, ApexInstitution } from '../types';
 import PackageInstructionsModal from '../components/PackageInstructionsModal';
 import { NotesRichEditor } from '../components/NotesRichEditor';
 import { listQuestionImports, getQuestionImportQuestions } from '../api/apexAssessmentApi';
@@ -31,7 +31,11 @@ import {
   uploadApexCourseDocument,
   getApexPackages,
   saveApexPackage,
-  deleteApexPackage
+  deleteApexPackage,
+  getApexInstitutions,
+  saveApexInstitution,
+  deleteApexInstitution,
+  uploadApexInstitutionLogo
 } from '../api/apexAssessmentApi';
 import { NewExamBuilderPage } from './NewExamBuilderPage';
 import { CertificateGeneratorPanel } from '../components/CertificateGeneratorPanel';
@@ -62,7 +66,7 @@ import {
   Upload
 } from 'lucide-react';
 
-type Tab = 'exams' | 'courses' | 'packages' | 'interview_products' | 'questions' | 'financials' | 'certificates' | 'transcripts';
+type Tab = 'exams' | 'courses' | 'institutions' | 'packages' | 'interview_products' | 'questions' | 'financials' | 'certificates' | 'transcripts';
 
 const PACKAGE_ID_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
@@ -107,7 +111,10 @@ export const ApexRecruiterPage: React.FC = () => {
 
   // Packages
   const [packages, setPackages] = useState<ApexPackage[]>([]);
+  const [institutions, setInstitutions] = useState<ApexInstitution[]>([]);
   const [editingPackage, setEditingPackage] = useState<ApexPackage | null>(null);
+  const [editingInstitution, setEditingInstitution] = useState<ApexInstitution | null>(null);
+  const [uploadingInstitutionLogoId, setUploadingInstitutionLogoId] = useState<string | null>(null);
   const [instructionsPackage, setInstructionsPackage] = useState<ApexPackage | null>(null);
     const [packageExamSearch, setPackageExamSearch] = useState('');
   const [packageCourseSearch, setPackageCourseSearch] = useState('');
@@ -168,6 +175,7 @@ export const ApexRecruiterPage: React.FC = () => {
     setExams(await getApexExams());
     setCourses(await getApexCourses());
     setPackages(await getApexPackages());
+    setInstitutions(await getApexInstitutions());
     setProducts(await getApexInterviewProducts());
     setQuestions(await getApexQuestions());
     setPayments(await getPaystackPayments());
@@ -417,6 +425,36 @@ export const ApexRecruiterPage: React.FC = () => {
     }
   };
 
+  const handleSaveInstitution = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingInstitution) return;
+    await saveApexInstitution(editingInstitution);
+    setEditingInstitution(null);
+    loadData();
+  };
+
+  const handleDeleteInstitution = async (id: string) => {
+    if (!confirm('Delete this institution?')) return;
+    try {
+      await deleteApexInstitution(id);
+      await loadData();
+    } catch (err: any) {
+      window.alert(err.message || 'Failed to delete institution');
+    }
+  };
+
+  const handleUploadInstitutionLogo = async (institutionId: string, file: File) => {
+    setUploadingInstitutionLogoId(institutionId);
+    try {
+      await uploadApexInstitutionLogo(institutionId, file);
+      await loadData();
+    } catch (err: any) {
+      window.alert(err.message || 'Failed to upload institution logo');
+    } finally {
+      setUploadingInstitutionLogoId(null);
+    }
+  };
+
   // ── Interview Products ──
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -465,8 +503,18 @@ export const ApexRecruiterPage: React.FC = () => {
     return (
       pkg.name.toLowerCase().includes(normalizedTabSearch) ||
       (pkg.packageId || '').toLowerCase().includes(normalizedTabSearch) ||
+      (pkg.institution?.name || '').toLowerCase().includes(normalizedTabSearch) ||
       (pkg.category || '').toLowerCase().includes(normalizedTabSearch) ||
       (pkg.description || '').toLowerCase().includes(normalizedTabSearch)
+    );
+  });
+
+  const filteredInstitutions = institutions.filter((institution) => {
+    if (!normalizedTabSearch) return true;
+    return (
+      institution.name.toLowerCase().includes(normalizedTabSearch) ||
+      (institution.description || '').toLowerCase().includes(normalizedTabSearch) ||
+      (institution.websiteUrl || '').toLowerCase().includes(normalizedTabSearch)
     );
   });
 
@@ -634,6 +682,16 @@ export const ApexRecruiterPage: React.FC = () => {
         >
           <BookOpen className="h-4 w-4 text-sky-400" />
           <span>Courses ({courses.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('institutions')}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+            activeTab === 'institutions' ? 'bg-slate-900 text-white shadow-xs' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <Award className="h-4 w-4 text-cyan-400" />
+          <span>Institutions ({institutions.length})</span>
         </button>
 
         <button
@@ -1624,6 +1682,151 @@ export const ApexRecruiterPage: React.FC = () => {
         </div>
       )}
 
+      {/* Tab: Institutions */}
+      {activeTab === 'institutions' && (
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-extrabold text-slate-900">Training Institutions</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Create and manage institutions offering package training, including branded logos.
+              </p>
+            </div>
+            <button
+              onClick={() =>
+                setEditingInstitution({
+                  id: `inst-${Date.now()}`,
+                  name: '',
+                  description: '',
+                  websiteUrl: '',
+                  logoUrl: '',
+                  isActive: true
+                })
+              }
+              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white font-extrabold text-xs rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
+            >
+              <Plus className="h-4 w-4" /> New Institution
+            </button>
+          </div>
+
+          {editingInstitution && (
+            <form onSubmit={handleSaveInstitution} className="p-5 bg-slate-50 text-slate-900 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                <span className="font-extrabold text-sm text-slate-900">Institution Profile</span>
+                <button type="button" onClick={() => setEditingInstitution(null)} className="p-1 text-slate-400 hover:text-slate-900">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Institution Name</label>
+                  <input
+                    type="text"
+                    value={editingInstitution.name}
+                    onChange={(e) => setEditingInstitution({ ...editingInstitution, name: e.target.value })}
+                    required
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Website (optional)</label>
+                  <input
+                    type="text"
+                    value={editingInstitution.websiteUrl || ''}
+                    onChange={(e) => setEditingInstitution({ ...editingInstitution, websiteUrl: e.target.value })}
+                    placeholder="https://institution.example"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Description (optional)</label>
+                <textarea
+                  value={editingInstitution.description || ''}
+                  onChange={(e) => setEditingInstitution({ ...editingInstitution, description: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900"
+                />
+              </div>
+
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={editingInstitution.isActive}
+                  onChange={(e) => setEditingInstitution({ ...editingInstitution, isActive: e.target.checked })}
+                />
+                Active (available for package assignment)
+              </label>
+
+              <button
+                type="submit"
+                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5"
+              >
+                <Save className="h-4 w-4" /> Save Institution
+              </button>
+            </form>
+          )}
+
+          <div className="space-y-3">
+            {filteredInstitutions.length === 0 && <p className="text-center py-8 text-slate-400 text-xs">No institutions matched your search.</p>}
+            {filteredInstitutions.map((institution) => (
+              <div
+                key={institution.id}
+                className="p-4 bg-slate-50 rounded-2xl border border-slate-200 hover:border-cyan-300 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-14 h-14 rounded-xl border border-slate-200 bg-white overflow-hidden shrink-0 flex items-center justify-center">
+                    {institution.logoUrl ? (
+                      <img src={institution.logoUrl} alt={`${institution.name} logo`} className="w-full h-full object-contain p-1" />
+                    ) : (
+                      <span className="text-[10px] font-bold text-slate-400">No Logo</span>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      {!institution.isActive && <span className="text-[10px] font-extrabold bg-slate-200 text-slate-600 px-2 py-0.5 rounded">INACTIVE</span>}
+                      <h4 className="text-sm font-extrabold text-slate-900">{institution.name}</h4>
+                    </div>
+                    {institution.websiteUrl && (
+                      <a href={institution.websiteUrl} target="_blank" rel="noreferrer" className="text-[11px] text-cyan-700 font-semibold hover:underline">
+                        {institution.websiteUrl}
+                      </a>
+                    )}
+                    {institution.description && <p className="text-[11px] text-slate-600">{institution.description}</p>}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-center">
+                  <label className="p-2 text-cyan-600 hover:bg-cyan-50 rounded-lg cursor-pointer" title="Upload Logo">
+                    <Upload className="h-4 w-4" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingInstitutionLogoId === institution.id}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (!file) return;
+                        void handleUploadInstitutionLogo(institution.id, file);
+                      }}
+                    />
+                  </label>
+                  <button onClick={() => setEditingInstitution(institution)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg cursor-pointer">
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                  <button onClick={() => handleDeleteInstitution(institution.id)} className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Tab: Packages */}
       {activeTab === 'packages' && (
         <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs space-y-6">
@@ -1639,6 +1842,7 @@ export const ApexRecruiterPage: React.FC = () => {
                 setEditingPackage({
                   id: `package-${Date.now()}`,
                   name: '',
+                  institutionId: null,
                   packageId: suggestPackageId(packages),
                   description: '',
                   category: '',
@@ -1712,6 +1916,22 @@ export const ApexRecruiterPage: React.FC = () => {
                 <p className="text-[10px] text-slate-500">
                   Up to 6 letters, automatically capitalized. Shown to candidates right after the package title.
                 </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Training Institution (optional)</label>
+                <select
+                  value={editingPackage.institutionId || ''}
+                  onChange={(e) => setEditingPackage({ ...editingPackage, institutionId: e.target.value || null })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900"
+                >
+                  <option value="">Atesta (default)</option>
+                  {institutions
+                    .filter((institution) => institution.isActive)
+                    .map((institution) => (
+                      <option key={institution.id} value={institution.id}>{institution.name}</option>
+                    ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1912,6 +2132,9 @@ export const ApexRecruiterPage: React.FC = () => {
                     </h4>
                     <p className="text-[11px] text-slate-600">
                       {pExamIds.length} exam{pExamIds.length === 1 ? '' : 's'} + {pCourseIds.length} course{pCourseIds.length === 1 ? '' : 's'}
+                    </p>
+                    <p className="text-[11px] text-slate-600">
+                      Institution: <span className="font-semibold text-slate-800">{p.institution?.name || 'Atesta'}</span>
                     </p>
                   </div>
                   <div className="flex items-center gap-2 self-start sm:self-center">

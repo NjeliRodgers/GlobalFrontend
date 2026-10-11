@@ -253,9 +253,20 @@ export interface ApexPackageInstructions {
   interviewIntro?: string;
 }
 
+export interface ApexInstitution {
+  id: string;
+  name: string;
+  description?: string | null;
+  websiteUrl?: string | null;
+  logoUrl?: string | null;
+  isActive: boolean;
+}
+
 export interface ApexPackage {
   id: string;
   name: string;
+  institutionId?: string | null;
+  institution?: ApexInstitution | null;
   packageId?: string;
   description?: string;
   category?: string;
